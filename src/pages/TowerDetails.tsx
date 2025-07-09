@@ -36,6 +36,7 @@ const InteractiveImageUploader = () => {
   const [orderNumber, setOrderNumber] = useState<number>(0);
   const [isExistingTower, setIsExistingTower] = useState(false);
   const [svgContent, setSvgContent] = useState<string | null>(null);
+  const [direction, setDirection] = useState('');
   const svgRef = useRef<SVGSVGElement>(null);
   const navigate = useNavigate();
   const { tower_id, project_id } = useParams();
@@ -67,38 +68,43 @@ const InteractiveImageUploader = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchTower = async () => {
-      if (!tower_id) return;
-      
-      try {
-        const response = await axiosInstance.get(`/api/towers/${tower_id}`);
-        const { name, floor_count, tower_plans } = response.data.tower;
+  const fetchTower = async (orderParam = orderNumber) => {
+    if (!tower_id) return;
+    
+    try {
+      const response = await axiosInstance.get(`/api/towers/${tower_id}?order=${orderParam}`);
+      const { name, floor_count, tower_plans } = response.data.tower;
 
-        setTowerName(name);
-        setFloorCount(floor_count);
+      setTowerName(name);
+      setFloorCount(floor_count);
+      setImageSrc('');
+      setSvgContent('');
+      setIsExistingTower(false);
+      if (tower_plans.length > 0) {
+        const { image_url, svg_url,order,direction } = tower_plans[0];
+        setOrderNumber(Number(order));
+        setDirection(direction)
 
-        if (tower_plans.length > 0) {
-          const { image_url, svg_url } = tower_plans[0];
-          // Load image
-          const imageResp = await fetch(image_url);        
-          const imageBlob = await imageResp.blob();
-          const imageBase64 = await convertBlobToBase64(imageBlob);
-          setImageSrc(imageBase64 as string);
+        // Load image
+        const imageResp = await fetch(image_url);        
+        const imageBlob = await imageResp.blob();
+        const imageBase64 = await convertBlobToBase64(imageBlob);
+        setImageSrc(imageBase64 as string);
 
-          // Load SVG content
-          const svgResp = await fetch(svg_url);
-          const svgText = await svgResp.text();
-          setSvgContent(svgText);
-          setIsExistingTower(true); // Set to true for existing building
-        }
-      } catch (err) {
-        console.error("Error fetching tower data:", err);
-        // setError("Failed to load building data.");
+        // Load SVG content
+        const svgResp = await fetch(svg_url);
+        const svgText = await svgResp.text();
+        setSvgContent(svgText);
+        setIsExistingTower(true); // Set to true for existing building
       }
-    };
+    } catch (err) {
+      console.error("Error fetching tower data:", err);
+      // setError("Failed to load building data.");
+    }
+  };
 
-    fetchTower();
+  useEffect(() => {
+    fetchTower(orderNumber);
   }, [tower_id]);
 
   const convertBlobToBase64 = (blob: Blob): Promise<string | ArrayBuffer | null> => {
@@ -264,6 +270,7 @@ const InteractiveImageUploader = () => {
       formData.append('image', imageBlob, 'building.jpg');
       formData.append('svg', svgBlob, 'building.svg');
       formData.append('tower_id', tower_id as string);
+      formData.append('direction', direction);
 
       await axiosInstance.post('/api/towers', formData, {
         headers: {
@@ -274,7 +281,7 @@ const InteractiveImageUploader = () => {
       setSuccess('Tower saved successfully');
       // Reset form after successful save
       setTowerName('');
-      setOrderNumber(0);
+      // setOrderNumber(0);
       setShapes([]);
       setImageSrc(null);
     } catch (err: any) {
@@ -382,7 +389,7 @@ const InteractiveImageUploader = () => {
       }
 
       return elements;
-    } else if (shape.type === 'line') {
+    } else if (shape.type === 'line') {      
       const [start, end] = shape.points;
       return (
         <line
@@ -420,6 +427,13 @@ const InteractiveImageUploader = () => {
     }
   };
 
+  const handleOrderChange = (e: SelectChangeEvent) => {    
+    const newOrder = Number(e.target.value);    
+    setOrderNumber(newOrder);
+    setDirection('');
+    fetchTower(newOrder);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 60}}>
@@ -436,23 +450,39 @@ const InteractiveImageUploader = () => {
       </Box>
 
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-          <InputLabel id="order-number-label">Order Number</InputLabel>
-          <Select
-            labelId="order-number-label"
-            value={orderNumber.toString()}
-            onChange={(e: SelectChangeEvent) =>
-              setOrderNumber(Number(e.target.value))
-            }
-            required
-            fullWidth
-          >
-            {[0, 1, 2, 3, 4, 5, 6].map((num) => (
-            <MenuItem key={num} value={num}>
-              {num}
-            </MenuItem>
-          ))}
-          </Select>
+        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 4, mb: 3 }}>
+          <Box sx={{ minWidth: 200 }}>
+            <InputLabel id="order-number-label">Order Number</InputLabel>
+            <Select
+              labelId="order-number-label"
+              value={orderNumber.toString()}
+              onChange={handleOrderChange}
+              required
+              fullWidth
+            >
+              {[0, 1, 2, 3, 4, 5, 6].map((num) => (
+                <MenuItem key={num} value={num}>
+                  {num}
+                </MenuItem>
+              ))}
+            </Select>
+          </Box>
+          <Box sx={{ minWidth: 250 }}>
+            <InputLabel id="direction-label">Direction</InputLabel>
+            <Select
+              labelId="direction-label"
+              value={direction}
+              onChange={(e: SelectChangeEvent) => setDirection(e.target.value)}
+              required
+              fullWidth
+            >
+              {['North', 'South', 'East', 'West', 'North-East', 'North-West', 'South-East', 'South-West'].map((dir) => (
+                <MenuItem key={dir} value={dir}>
+                  {dir}
+                </MenuItem>
+              ))}
+            </Select>
+          </Box>
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>

@@ -25,6 +25,12 @@ interface Stats {
   total: number;
   active: number;
 }
+interface EnquiryStats {
+  total: number;
+  pending: number;
+  confirmed: number;
+  cancelled: number;
+}
 
 const StatCard: React.FC<{
   title: string;
@@ -32,7 +38,8 @@ const StatCard: React.FC<{
   icon: React.ReactNode;
   color: string;
   loading?: boolean;
-}> = ({ title, value, icon, color, loading }) => {
+  rightColumn?: React.ReactNode;
+}> = ({ title, value, icon, color, loading, rightColumn }) => {
   const theme = useTheme();
   
   return (
@@ -81,6 +88,11 @@ const StatCard: React.FC<{
             >
               {icon}
             </Box>
+            {rightColumn && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', ml: 2 }}>
+                {rightColumn}
+              </Box>
+            )}
           </Box>
           <Typography
             variant="h3"
@@ -121,6 +133,13 @@ const Dashboard: React.FC = () => {
     total: 0,
     active: 0
   });
+  const [enquiries, setEnquiryStats] = useState<EnquiryStats>({
+    total: 0,
+    confirmed: 0,
+    pending:0,
+    cancelled:0
+
+  });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -129,7 +148,8 @@ const Dashboard: React.FC = () => {
       setRefreshing(true);
       const response = await axiosInstance.get('/api/dashboard/states');        
       setCustomerStats(response.data.data.customers);
-      setProjectStats(response.data.data.projects);        
+      setProjectStats(response.data.data.projects);      
+      setEnquiryStats(response.data.data.enquiries);  
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
     } finally {
@@ -227,11 +247,24 @@ const Dashboard: React.FC = () => {
               loading={refreshing}
             />
             <StatCard
-              title="Active Projects"
-              value={projects.active}
+              title="Total Enquiries"
+              value={enquiries.total}
               icon={<TrendingUpIcon />}
               color={theme.palette.warning.main}
               loading={refreshing}
+              rightColumn={
+                <>
+                  <Typography variant="caption" sx={{ color: theme.palette.grey[700], fontSize: 12 }}>
+                    Pending: {enquiries.pending}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: theme.palette.success.dark, fontSize: 12 }}>
+                    Confirmed: {enquiries.confirmed}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: theme.palette.error.main, fontSize: 12 }}>
+                    Cancelled: {enquiries.cancelled}
+                  </Typography>
+                </>
+              }
             />
           </Box>
         </Box>

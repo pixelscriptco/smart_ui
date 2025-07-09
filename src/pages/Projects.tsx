@@ -29,8 +29,10 @@ import {
   Select,
   MenuItem,
   Chip,
+  Switch,
   TablePagination,
   InputAdornment,
+  FormControlLabel,
   Grid
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon, Search as SearchIcon } from '@mui/icons-material';
@@ -257,6 +259,27 @@ const Projects: React.FC = () => {
     }
   };
 
+  const handleStatusChange = async (projectId: number, newStatus: 1 | 0) => {
+    try {
+      // Update the status in the backend
+      await axiosInstance.patch(`/api/projects/status/${projectId}`, {
+        status: newStatus
+      });
+
+      // Update the local state
+      setProjects(prevProjects =>
+        prevProjects.map(project =>
+          project.id === projectId
+            ? { ...project, status: newStatus }
+            : project
+        )
+      );
+    } catch (err) {
+      console.error('Error updating client status:', err);
+      // You might want to show an error message to the user here
+    }
+  };
+
   const handleProjectClick = (projectId: number) => {
     navigate(`/projects/${projectId}`);
   };
@@ -387,11 +410,32 @@ const Projects: React.FC = () => {
                       <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.User.company}</TableCell>
                       <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.description}</TableCell>
                       <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.url}</TableCell>
-                      <TableCell onClick={() => navigate(`/projects/${project.id}`)}>
+                      {/* <TableCell onClick={() => navigate(`/projects/${project.id}`)}>
                         <Chip 
                           label={project.status === 1 ? 'active':'inactive'} 
                           color={project.status === 1 ? 'success' : 'error'}
                           size="small"
+                        />
+                      </TableCell> */}
+                      <TableCell>
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              checked={project.status === 1}
+                              onChange={(e) => handleStatusChange(
+                                project.id,
+                                e.target.checked ? 1 : 0
+                              )}
+                              color="success"
+                            />
+                          }
+                          label={project.status === 1 ? 'active':'inactive'}
+                          sx={{
+                            '& .MuiFormControlLabel-label': {
+                              color: project.status === 1 ? 'success.main' : 'error.main',
+                              fontWeight: 500
+                            }
+                          }}
                         />
                       </TableCell>
                       <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{new Date(project.created_at).toLocaleDateString()}</TableCell>

@@ -168,29 +168,37 @@ const Enquiries: React.FC = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {enquiries.map((enquiry) => (
-                  <TableRow key={enquiry.id}>
-                    <TableCell>{enquiry.project?.name}</TableCell>
-                    <TableCell>{enquiry.unit?.name}</TableCell>
-                    <TableCell>{enquiry.first_name} {enquiry.last_name}</TableCell>
-                    <TableCell>{enquiry.email}</TableCell>
-                    <TableCell>{enquiry.mobile}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={enquiry.status.charAt(0).toUpperCase() + enquiry.status.slice(1)}
-                        color={statusColors[enquiry.status] || 'info'}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={enquiry.type.charAt(0).toUpperCase() + enquiry.type.slice(1)}
-                        color={typeColors[enquiry.type] || 'info'}
-                        size="small"
-                      />
+                {enquiries.length === 0 && !loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      No Enquiries Found
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  enquiries.map((enquiry) => (
+                    <TableRow key={enquiry.id}>
+                      <TableCell>{enquiry.project?.name}</TableCell>
+                      <TableCell>{enquiry.unit?.name}</TableCell>
+                      <TableCell>{enquiry.first_name} {enquiry.last_name}</TableCell>
+                      <TableCell>{enquiry.email}</TableCell>
+                      <TableCell>{enquiry.mobile}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={enquiry.status.charAt(0).toUpperCase() + enquiry.status.slice(1)}
+                          color={statusColors[enquiry.status] || 'info'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={enquiry.type.charAt(0).toUpperCase() + enquiry.type.slice(1)}
+                          color={typeColors[enquiry.type] || 'info'}
+                          size="small"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
             <TablePagination

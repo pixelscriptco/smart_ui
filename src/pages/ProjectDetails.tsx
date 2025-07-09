@@ -306,7 +306,7 @@ const ProjectDetails: React.FC = () => {
       </Box>
 
       {/* Construction Updates Section */}
-      <Box sx={{ mt: 6 }}>
+      {/* <Box sx={{ mt: 6 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h5">Construction Updates</Typography>
           <Button
@@ -342,10 +342,10 @@ const ProjectDetails: React.FC = () => {
             </ImageListItem>
           ))}
         </ImageList>
-      </Box>
+      </Box> */}
 
       {/* Upload Dialog */}
-      <Dialog open={openUploadDialog} onClose={() => setOpenUploadDialog(false)} maxWidth="sm" fullWidth>
+      {/* <Dialog open={openUploadDialog} onClose={() => setOpenUploadDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Add Construction Update</DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 2 }}>
@@ -399,7 +399,7 @@ const ProjectDetails: React.FC = () => {
             {uploading ? <CircularProgress size={24} /> : 'Upload'}
           </Button>
         </DialogActions>
-      </Dialog>
+      </Dialog> */}
     </Container>
   );
 };

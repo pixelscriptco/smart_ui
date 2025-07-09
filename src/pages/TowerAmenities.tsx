@@ -205,9 +205,9 @@ const TowerAmenities = () => {
           </Button>
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(`/projects/${project_id}/towers/${tower_id}`)}
+            onClick={() => navigate(`/projects/${project_id}/towers`)}
           >
-            Back to Tower
+            Back to Towers
           </Button>
         </Box>
       </Box>

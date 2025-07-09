@@ -44,3 +44,8 @@ You don’t have to ever use `eject`. The curated feature set is suitable for sm
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
 To learn React, check out the [React documentation](https://reactjs.org/).
+
+mysql -h smart-building.c9sweas28cv0.ap-south-1.rds.amazonaws.com -u admin -p
+
+PORT=3001 pm2 start server.js --name api
+npx sequelize-cli db:migrate --to 20240607000001_add_cost_to_unit_table.js

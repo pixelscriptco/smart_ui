@@ -68,6 +68,7 @@ const Units: React.FC = () => {
   const [showFloorPlansModal, setShowFloorPlansModal] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [floorPlans, setFloorPlans] = useState<UnitPlan[]>([]);
+  const [statusLoading, setStatusLoading] = useState<{ [unitId: string]: boolean }>({});
   const [loadingFloorPlans, setLoadingFloorPlans] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<UnitPlan | null>(null);
   const navigate = useNavigate();
@@ -435,23 +436,63 @@ const Units: React.FC = () => {
             <CircularProgress />
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'flex-start' }}>
             {units.map((unit) => (
-              <Box key={unit.id} sx={{ flex: '1 1 300px', minWidth: 0 }}>
+              <Box
+                key={unit.id}
+                sx={{
+                  flex: '1 1 22%', // 4 per row on large screens
+                  maxWidth: { xs: '100%', sm: '48%', md: '23%', lg: '23%' },
+                  minWidth: 0,
+                  mb: 3,
+                }}
+              >
                 <Card>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                       <Typography variant="h6" component="div">
                         {unit.name}
                       </Typography>
-                      <Chip 
-                        label={unit.unit_status.name.toUpperCase()} 
-                        sx={{
-                          backgroundColor: unit.unit_status.color || '#ccc',
-                          color: '#000', // or choose text color for contrast
-                        }}
-                        size="small"
-                      />
+                      <FormControl size="small" sx={{ minWidth: 120 }}>
+                        <Select
+                          value={unit.unit_status.id}
+                          onChange={async (e) => {
+                            setStatusLoading((prev) => ({ ...prev, [unit.id]: true }));
+                            try {
+                              await axiosInstance.put(`/api/units/${unit.id}/status`, { status: Number(e.target.value) });
+                              fetchUnits();
+                            } finally {
+                              setStatusLoading((prev) => ({ ...prev, [unit.id]: false }));
+                            }
+                          }}
+                          disabled={!!statusLoading[unit.id]}
+                          sx={{
+                            backgroundColor:
+                              unit.unit_status.id === 1
+                                ? '#d0f5e8' // green for available
+                                : unit.unit_status.id === 2
+                                ? '#ffd6d6' // red for booked
+                                : unit.unit_status.id === 3
+                                ? '#d6e6ff' // blue for hold
+                                : 'inherit',
+                            '& .MuiSelect-select': {
+                              fontWeight: 600,
+                              color:
+                                unit.unit_status.id === 1
+                                  ? '#388e3c'
+                                  : unit.unit_status.id === 2
+                                  ? '#d32f2f'
+                                  : unit.unit_status.id === 3
+                                  ? '#1976d2'
+                                  : 'inherit',
+                            },
+                          }}
+                        >
+                          <MenuItem value={1}>Available</MenuItem>
+                          <MenuItem value={2}>Booked</MenuItem>
+                          <MenuItem value={3}>Hold</MenuItem>
+                        </Select>
+                      </FormControl>
                     </Box>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       Unit {unit.number}
@@ -471,14 +512,14 @@ const Units: React.FC = () => {
                         fullWidth
                         onClick={() => navigate(`/projects/${project_id}/units/${unit.id}`)}
                       >
-                        View Details
+                        View
                       </Button>
                       <Button
                         variant="contained"
                         fullWidth
                         onClick={() => handleAddPlan(unit.id)}
                       >
-                        {unit.unit_plans ? 'Edit Plan' : 'Add Plan'}
+                        {unit.unit_plans ? 'Edit' : 'Add'}
                       </Button>
                     </Box>
                   </CardContent>

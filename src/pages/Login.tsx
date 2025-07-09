@@ -92,11 +92,11 @@ const Login: React.FC = () => {
           >
             Sign In
           </Button>
-          <Box sx={{ textAlign: 'center' }}>
+          {/* <Box sx={{ textAlign: 'center' }}>
             <Link component={RouterLink} to="/register" variant="body2">
               Don't have an account? Sign up
             </Link>
-          </Box>
+          </Box> */}
         </Box>
       </Box>
     </Container>

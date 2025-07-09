@@ -12,6 +12,8 @@ import {
   Dashboard as DashboardIcon,
   MeetingRoom as RoomIcon,
   Devices as DeviceIcon,
+  Group as GroupIcon,
+  ContactMail as ContactMailIcon,
 } from '@mui/icons-material';
 
 const Sidebar: React.FC = () => {
@@ -40,6 +42,18 @@ const Sidebar: React.FC = () => {
             <RoomIcon />
           </ListItemIcon>
           <ListItemText primary="Projects" />
+        </ListItemButton>
+        <ListItemButton component={Link} to="/clients">
+          <ListItemIcon>
+            <GroupIcon />
+          </ListItemIcon>
+          <ListItemText primary="Clients" />
+        </ListItemButton>
+        <ListItemButton component={Link} to="/enquiries">
+          <ListItemIcon>
+            <ContactMailIcon />
+          </ListItemIcon>
+          <ListItemText primary="Enquiries" />
         </ListItemButton>
         <ListItemButton component={Link} to="/settings">
           <ListItemIcon>

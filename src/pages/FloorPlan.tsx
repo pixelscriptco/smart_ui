@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Box, Button, Typography, Paper, CircularProgress, Alert, ToggleButton, ToggleButtonGroup, IconButton, Tooltip, TextField } from '@mui/material';
+import { Box, Button, Typography, Paper, CircularProgress, Alert, ToggleButton, ToggleButtonGroup, IconButton, Tooltip, TextField, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { CloudUpload as CloudUploadIcon, Save as SaveIcon, Straighten as LineIcon, Rectangle as RectangleIcon, Undo as UndoIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import axiosInstance from '../utils/axios';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -39,7 +39,8 @@ const InteractiveImageUploader = () => {
   const { project_id, floor_id } = useParams();
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [pendingPolygon, setPendingPolygon] = useState<Point[]>([]);
-
+  const [floorPlans, setFloorPlans] = useState<any[]>([]);
+  const [selectedFloorPlanId, setSelectedFloorPlanId] = useState<string>('');
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -96,6 +97,19 @@ const InteractiveImageUploader = () => {
     };
 
     fetchFloorPlan();
+  }, [project_id]);
+
+  useEffect(() => {
+    const fetchFloorPlans = async () => {
+      if (!project_id) return;
+      try {
+        const response = await axiosInstance.get(`/api/projects/${project_id}/floor-plans`);
+        setFloorPlans(response.data.floor_plans || []);
+      } catch (err) {
+        console.error('Error fetching floor plans:', err);
+      }
+    };
+    fetchFloorPlans();
   }, [project_id]);
 
   const convertBlobToBase64 = (blob: Blob): Promise<string | ArrayBuffer | null> => {
@@ -236,17 +250,18 @@ const InteractiveImageUploader = () => {
       formData.append('image', imageBlob, 'floor_plan.jpg');
       formData.append('svg', svgBlob, 'floor_plan.svg');
       formData.append('project_id', project_id as string);
-
+      
       // Convert shapes to include unit numbers as IDs
       const shapesWithUnitIds = shapes.map(shape => {
+        
         const unitId = shape.name ? parseInt(shape.name) : undefined;
         return {
           ...shape,
           unit_id: unitId
         };
       });
-
-      formData.append('units', JSON.stringify(shapesWithUnitIds));
+      
+      formData.append('units',shapes.length.toString());
 
       const response = await axiosInstance.post('/api/floors/floorplan', formData, {
         headers: {
@@ -255,7 +270,6 @@ const InteractiveImageUploader = () => {
       });
 
       setSuccess('Floor Plan saved successfully');
-      // Reset form after successful save
       setFloorPlanName('');
       setShapes([]);
       setImageSrc(null);
@@ -274,6 +288,27 @@ const InteractiveImageUploader = () => {
     } else if (shapes.length > 0) {
       // If we have shapes, remove the last one
       setShapes(prev => prev.slice(0, -1));
+    }
+  };
+
+  const handleSelectFloorPlan = async (floorPlanId: string) => {
+    setSelectedFloorPlanId(floorPlanId);
+    try {
+      const response = await axiosInstance.get(`/api/floor-plans/${floorPlanId}`);
+      const { name, image_url, svg_url } = response.data.floor_plan;
+      setFloorPlanName(name);
+      // Load image
+      const imageResp = await fetch(image_url);
+      const imageBlob = await imageResp.blob();
+      const imageBase64 = await convertBlobToBase64(imageBlob);
+      setImageSrc(imageBase64 as string);
+      // Load SVG content
+      const svgResp = await fetch(svg_url);
+      const svgText = await svgResp.text();
+      setSvgContent(svgText);
+      setIsExistingFloorPlan(true);
+    } catch (err) {
+      console.error('Error loading selected floor plan:', err);
     }
   };
 
@@ -333,16 +368,15 @@ const InteractiveImageUploader = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 60}}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 4 }}>
         <Typography variant="h4">
-          Manage FloorPlan
+          Manage Floor Plan
         </Typography>
         <Button
-          // variant="outlined"
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(`/projects/${project_id}`)}
+          onClick={() => navigate(`/projects/${project_id}/floors`)}
         >
-          Back to Project
+          Back to Floors
         </Button>
       </Box>
 
@@ -419,6 +453,21 @@ const InteractiveImageUploader = () => {
             >
               {saving ? <CircularProgress size={24} /> : 'Save Floor Plan'}
             </Button>
+
+            {/* Floor Plan Dropdown */}
+            {/* <FormControl sx={{ minWidth: 220, ml: 2 }} size="small">
+              <InputLabel>Floor Plans</InputLabel>
+              <Select
+                value={selectedFloorPlanId}
+                label="Floor Plans"
+                onChange={(e) => handleSelectFloorPlan(e.target.value)}
+              >
+                <MenuItem value="">Select Floor Plan</MenuItem>
+                {floorPlans.map((plan) => (
+                  <MenuItem key={plan.id} value={plan.id}>{plan.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl> */}
           </Box>
         )}
         {error && (

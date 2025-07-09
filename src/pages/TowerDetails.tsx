@@ -3,6 +3,7 @@ import { Box, Button, Typography, Paper, CircularProgress, Alert, ToggleButton, 
 import { CloudUpload as CloudUploadIcon, Save as SaveIcon, Straighten as LineIcon, Rectangle as RectangleIcon, Undo as UndoIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import axiosInstance from '../utils/axios';
 import { useNavigate, useParams } from 'react-router-dom';
+import { SelectChangeEvent } from '@mui/material/Select';
 
 type Point = {
   x: number;
@@ -32,7 +33,7 @@ const InteractiveImageUploader = () => {
   const [currentPolygon, setCurrentPolygon] = useState<Point[]>([]);
   const [towerName, setTowerName] = useState('');
   const [floorCount, setFloorCount] = useState(0);
-  const [orderNumber, setOrderNumber] = useState(0);
+  const [orderNumber, setOrderNumber] = useState<number>(0);
   const [isExistingTower, setIsExistingTower] = useState(false);
   const [svgContent, setSvgContent] = useState<string | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -304,10 +305,10 @@ const InteractiveImageUploader = () => {
     const maxY = Math.max(...points.map(p => p.y));
     
     // Calculate spacing between lines
-    const spacing = (maxY - minY) / (floorCount - 1);
+    const spacing = (maxY - minY) / (floorCount);
     
     // Generate horizontal lines from bottom to top
-    for (let i = 0; i < floorCount; i++) {
+    for (let i = 0; i < floorCount+1; i++) {
       const y = maxY - (spacing * i); // Start from bottom (maxY) and go up
       lines.push([
         { x: minX, y: y },
@@ -439,8 +440,10 @@ const InteractiveImageUploader = () => {
           <InputLabel id="order-number-label">Order Number</InputLabel>
           <Select
             labelId="order-number-label"
-            value={orderNumber}
-            onChange={(e) => setOrderNumber(parseInt(e.target.value as string) || 0)}
+            value={orderNumber.toString()}
+            onChange={(e: SelectChangeEvent) =>
+              setOrderNumber(Number(e.target.value))
+            }
             required
             fullWidth
           >

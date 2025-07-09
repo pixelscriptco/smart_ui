@@ -22,6 +22,9 @@ import Floors from './pages/Floors';
 import FloorPlan from './pages/FloorPlan';
 import Units from './pages/Units';
 import UnitPlan from './pages/UnitPlan';
+import Clients from './pages/Clients';
+import Enquiries from './pages/Enquiries';
+import UnitDetails from './pages/UnitDetails';
 
 const theme = createTheme({
   palette: {
@@ -185,6 +188,16 @@ const AppRoutes = () => {
             }
           />
           <Route
+            path="/projects/:project_id/units/:unit_id"
+            element={
+              isAuthenticated ? (
+                <UnitDetails />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
             path="/projects/:project_id/unit-plan"
             element={
               isAuthenticated ? (
@@ -199,6 +212,26 @@ const AppRoutes = () => {
             element={
               isAuthenticated ? (
                 <Settings />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/clients"
+            element={
+              isAuthenticated ? (
+                <Clients />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/enquiries"
+            element={
+              isAuthenticated ? (
+                <Enquiries />
               ) : (
                 <Navigate to="/login" replace />
               )

@@ -23,38 +23,64 @@ import {
   Tooltip,
   Avatar,
   CircularProgress,
-  Alert
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
+  TablePagination,
+  InputAdornment,
+  Grid
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon, Search as SearchIcon } from '@mui/icons-material';
 import axiosInstance from '../utils/axios';
 
+interface User {
+  company: string;
+}
 interface Project {
   id: number;
+  user_id: number;
   name: string;
   description: string;
+  logo: string;
+  url: string;
+  project_url: string;
   status: number;
-  logo?: string;
+  company_id: number;
+  User: User;
   created_at: string;
   updated_at: string;
 }
 
-interface FormData {
+interface Company {
+  id: number;
+  company: string;
+}
+
+interface ProjectFormData {
   name: string;
   description: string;
-  status: string;
+  project_url: string;
+  status: number;
   logo: File | null;
+  company_id: number;
 }
 
 const Projects: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<ProjectFormData>({
     name: '',
     description: '',
-    status: 'active',
-    logo: null
+    project_url: '',
+    status: 1,
+    logo: null,
+    company_id: 0
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -62,10 +88,23 @@ const Projects: React.FC = () => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<number | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
 
   useEffect(() => {
     fetchProjects();
+    fetchCompanies();
   }, []);
+
+  useEffect(() => {
+    const filtered = projects.filter(project => 
+      project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.User.company.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredProjects(filtered);
+  }, [projects, searchTerm]);
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -81,26 +120,40 @@ const Projects: React.FC = () => {
     }
   };
 
+  const fetchCompanies = async () => {
+    try {
+      const response = await axiosInstance.get('/api/projects/companies');
+      setCompanies(response.data.companies);
+    } catch (err) {
+      console.error('Error fetching companies:', err);
+    }
+  };
+
   const handleOpenModal = (project?: Project) => {
-    setSubmitError(null); // Clear previous submit errors
+    setSubmitError(null);
     if (project) {
       setIsEditing(true);
       setCurrentProjectId(project.id);
+      
       setFormData({
         name: project.name,
         description: project.description,
-        status: project.status === 1 ? 'active' : 'inactive', // Convert status number to string
-        logo: null // Cannot pre-fill file input for security reasons
+        project_url: project.project_url,
+        status: project.status,
+        logo: null,
+        company_id: project.user_id
       });
-      setLogoPreview(project.logo || null); // Pre-fill logo preview if exists
+      setLogoPreview(project.logo || null);
     } else {
       setIsEditing(false);
       setCurrentProjectId(null);
       setFormData({
         name: '',
         description: '',
-        status: 'active',
-        logo: null
+        project_url:'',
+        status: 1,
+        logo: null,
+        company_id: 0
       });
       setLogoPreview(null);
     }
@@ -109,20 +162,24 @@ const Projects: React.FC = () => {
 
   const handleCloseModal = () => {
     setOpen(false);
-    setSubmitError(null); // Clear submit errors on close
-    // Reset form data and editing state when modal closes
+    setSubmitError(null);
     setFormData({
       name: '',
       description: '',
-      status: 'active',
-      logo: null
+      project_url:'',
+      status: 1,
+      logo: null,
+      company_id: 0
     });
     setLogoPreview(null);
     setIsEditing(false);
     setCurrentProjectId(null);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | 
+    { target: { name: string; value: number | string } }
+  ) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -137,7 +194,6 @@ const Projects: React.FC = () => {
         ...prev,
         logo: file
       }));
-      // Create preview URL
       const reader = new FileReader();
       reader.onloadend = () => {
         setLogoPreview(reader.result as string);
@@ -148,14 +204,15 @@ const Projects: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitError(null); // Clear error before new submission
+    setSubmitError(null);
     setLoading(true);
 
     const formDataToSend = new FormData();
     formDataToSend.append('name', formData.name);
     formDataToSend.append('description', formData.description);
-    // Convert status string back to number for backend if needed, assuming 1 for active
-    formDataToSend.append('status', formData.status === 'active' ? '1' : '0'); 
+    formDataToSend.append('project_url', formData.project_url);
+    formDataToSend.append('status', formData.status === 1 ? '1' : '0');
+    formDataToSend.append('company_id', formData.company_id.toString());
     if (formData.logo) {
       formDataToSend.append('logo', formData.logo);
     }
@@ -175,7 +232,7 @@ const Projects: React.FC = () => {
         });
       }
       handleCloseModal();
-      fetchProjects(); // Refresh the list
+      fetchProjects();
     } catch (err: any) {
       console.error('Error submitting project:', err);
       setSubmitError(err.response?.data?.message || 'An unexpected error occurred.');
@@ -202,6 +259,15 @@ const Projects: React.FC = () => {
 
   const handleProjectClick = (projectId: number) => {
     navigate(`/projects/${projectId}`);
+  };
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   return (
@@ -251,6 +317,27 @@ const Projects: React.FC = () => {
           </Button>
         </Box>
 
+        <Box sx={{ mb: 3 }}>
+          <TextField
+            fullWidth
+            placeholder="Search by project name or company..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+              }
+            }}
+          />
+        </Box>
+
         {loading && <CircularProgress sx={{ mt: 4 }} />}
         {error && <Alert severity="error" sx={{ mt: 4 }}>{error}</Alert>}
 
@@ -266,152 +353,96 @@ const Projects: React.FC = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ 
-                  fontWeight: 600,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05) 
-                }}>Name</TableCell>
-                <TableCell sx={{ 
-                  fontWeight: 600,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05) 
-                }}>Logo</TableCell>
-                <TableCell sx={{ 
-                  fontWeight: 600,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05) 
-                }}>Description</TableCell>
-                <TableCell sx={{ 
-                  fontWeight: 600,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05) 
-                }}>Status</TableCell>
-                <TableCell sx={{ 
-                  fontWeight: 600,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05) 
-                }}>Created At</TableCell>
-                <TableCell sx={{ 
-                  fontWeight: 600,
-                  backgroundColor: alpha(theme.palette.primary.main, 0.05) 
-                }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Logo</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Url</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Created At</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {projects.length === 0 ? (
+              {filteredProjects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                    <Typography 
-                      variant="body1" 
-                      color="text.secondary"
-                      sx={{ 
-                        fontSize: '1.1rem',
-                        opacity: 0.7
-                      }}
-                    >
-                      No projects currently. Click the "Create Project" button to add one.
+                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      No projects found
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                projects.map((project) => (
-                  <TableRow 
-                    key={project.id}
-                    sx={{
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.02)
-                      },
-                      transition: 'background-color 0.2s'
-                    }}
-                  >
-                    <TableCell 
-                      onClick={() => handleProjectClick(project.id)}
-                      sx={{ 
-                        cursor: 'pointer',
-                        '&:hover': {
-                          color: 'primary.main',
-                        },
-                      }}
-                    >
-                      {project.name}
-                    </TableCell>
-                    <TableCell>
-                      <Avatar
-                        src={project.logo}
-                        sx={{ width: 40, height: 40 }}
-                      />
-                    </TableCell>
-                    <TableCell>{project.description}</TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{
-                          display: 'inline-block',
-                          px: 1.5,
-                          py: 0.5,
-                          borderRadius: 1,
-                          backgroundColor: project.status === 1 
-                            ? alpha(theme.palette.success.main, 0.1)
-                            : alpha(theme.palette.error.main, 0.1),
-                          color: project.status === 1
-                            ? theme.palette.success.main
-                            : theme.palette.error.main,
-                          fontSize: '0.875rem'
-                        }}
-                      >
-                        {project.status === 1 ? 'Active' : 'Inactive'}
-                      </Box>
-                    </TableCell>
-                    <TableCell>{new Date(project.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <Tooltip title="Edit">
-                        <IconButton 
-                          color="primary" 
+                filteredProjects
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((project) => (
+                    <TableRow key={project.id}  style={{ cursor: 'pointer'}}>
+                      <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.name}</TableCell>
+                      <TableCell onClick={() => navigate(`/projects/${project.id}`)}>
+                        <Avatar
+                          src={project.logo}
+                          sx={{ width: 40, height: 40 }}
+                        />
+                      </TableCell>
+                      <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.User.company}</TableCell>
+                      <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.description}</TableCell>
+                      <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.url}</TableCell>
+                      <TableCell onClick={() => navigate(`/projects/${project.id}`)}>
+                        <Chip 
+                          label={project.status === 1 ? 'active':'inactive'} 
+                          color={project.status === 1 ? 'success' : 'error'}
                           size="small"
-                          onClick={() => handleOpenModal(project)} // Call handleOpenModal with project data
-                          sx={{ 
-                            '&:hover': {
-                              backgroundColor: alpha(theme.palette.primary.main, 0.1)
-                            }
-                          }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton 
-                          color="error" 
-                          size="small"
-                          onClick={() => handleDelete(project.id)}
-                          sx={{ 
-                            '&:hover': {
-                              backgroundColor: alpha(theme.palette.error.main, 0.1)
-                            }
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        />
+                      </TableCell>
+                      <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{new Date(project.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Tooltip title="Edit">
+                          <IconButton 
+                            color="primary" 
+                            size="small"
+                            onClick={() => handleOpenModal(project)}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton 
+                            color="error" 
+                            size="small"
+                            onClick={() => handleDelete(project.id)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={filteredProjects.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
         </TableContainer>
 
         <Dialog 
           open={open} 
-          onClose={handleCloseModal} // Use the new close handler
+          onClose={handleCloseModal}
           maxWidth="sm" 
           fullWidth
-          PaperProps={{
-            sx: {
-              borderRadius: 2,
-              boxShadow: theme.shadows[3]
-            }
-          }}
         >
-          <DialogTitle id="project-modal-title" sx={{ pb: 1 }}>
-            {isEditing ? 'Edit Project' : 'Add New Project'} {/* Dynamic title */}
+          <DialogTitle>
+            {isEditing ? 'Edit Project' : 'Add New Project'}
           </DialogTitle>
-          <DialogContent sx={{ pt: 2 }}>
+          <DialogContent>
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-               <Box
+              <Box
                 component="label"
                 htmlFor="logo-upload"
                 sx={{
@@ -430,11 +461,10 @@ const Projects: React.FC = () => {
                     bgcolor: logoPreview ? 'transparent' : theme.palette.primary.main,
                     mb: 2,
                     border: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                     // Optional: add a fallback icon if no logo and not previewing
-                    '& img': { objectFit: 'cover' } // Ensure image covers the avatar area
+                    '& img': { objectFit: 'cover' }
                   }}
                 >
-                   {!logoPreview && <BusinessIcon sx={{ fontSize: 40 }} />} {/* Fallback icon */}
+                  {!logoPreview && <BusinessIcon sx={{ fontSize: 40 }} />}
                 </Avatar>
                 <Box
                   className="upload-overlay"
@@ -463,37 +493,51 @@ const Projects: React.FC = () => {
                 onChange={handleLogoChange}
                 style={{ display: 'none' }}
               />
-              <Typography 
-                variant="body2" 
-                color="text.secondary"
-              >
-                Click to upload project logo
+              <Typography variant="body2" color="text.secondary">
+                Click to upload project logo*
               </Typography>
             </Box>
-             <Box sx={{
+
+            <Box sx={{
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'left',
-              width: '100%', // Ensure Box takes full width for text fields
-              pl: 0 // Remove padding if not needed here
+              gap: 2
             }}>
               {submitError && (
-                <Typography variant="body2" color="error" sx={{ mb: 2 }}>{submitError}</Typography>
+                <Typography variant="body2" color="error">{submitError}</Typography>
               )}
 
-               <TextField
+              <FormControl fullWidth>
+                <InputLabel>Company</InputLabel>
+                <Select
+                  name="company_id"
+                  value={formData.company_id}
+                  onChange={handleInputChange}
+                  label="Company*"
+                  required
+                >
+                  {companies.map((company) => (
+                    <MenuItem key={company.id} value={company.id}>
+                      {company.company}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <TextField
                 fullWidth
                 label="Project Name"
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
                 required
-                sx={{ 
-                  mb: 3,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 1.5
-                  }
-                }}
+              />
+              <TextField
+                fullWidth
+                label="Project URL"
+                name="project_url"
+                value={formData.project_url}
+                onChange={handleInputChange}
               />
               <TextField
                 fullWidth
@@ -503,37 +547,17 @@ const Projects: React.FC = () => {
                 onChange={handleInputChange}
                 multiline
                 rows={4}
-                sx={{ 
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 1.5
-                  }
-                }}
               />
             </Box>
-
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3 }}>
-            <Button 
-              onClick={handleCloseModal} // Use the new close handler
-              sx={{ 
-                textTransform: 'none',
-                px: 2
-              }}
-            >
-              Cancel
-            </Button>
+          <DialogActions>
+            <Button onClick={handleCloseModal}>Cancel</Button>
             <Button 
               onClick={handleSubmit} 
               variant="contained" 
-              color="primary"
               disabled={loading}
-              sx={{ 
-                textTransform: 'none',
-                px: 3,
-                borderRadius: 1.5
-              }}
             >
-              {isEditing ? 'Save Changes' : 'Create Project'} {/* Dynamic button text */}
+              {isEditing ? 'Save Changes' : 'Create Project'}
             </Button>
           </DialogActions>
         </Dialog>

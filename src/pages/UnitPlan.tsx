@@ -153,14 +153,14 @@ const InteractiveImageUploader = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 60}}>
         <Typography variant="h4">
-          Manage FloorPlan
+          Manage Unit Plan
         </Typography>
         <Button
           // variant="outlined"
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(`/projects/${project_id}`)}
+          onClick={() => navigate(`/projects/${project_id}/units`)}
         >
-          Back to Project
+          Back to Unit
         </Button>
       </Box>
 

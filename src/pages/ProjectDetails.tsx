@@ -3,25 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
-  Paper,
   Box,
   Button,
   CircularProgress,
   Chip,
-  Grid,
   Card,
   CardContent,
-  CardActionArea,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  ImageList,
-  ImageListItem,
-  ImageListItemBar,
-  Stack
+  CardActionArea
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -30,6 +18,7 @@ import LayersIcon from '@mui/icons-material/Layers';
 import HomeIcon from '@mui/icons-material/Home';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import DeleteIcon from '@mui/icons-material/Delete';
+import SpaIcon from '@mui/icons-material/Spa';
 import axiosInstance from '../utils/axios';
 
 interface Project {
@@ -60,7 +49,7 @@ interface ConstructionUpdate {
 }
 
 const ProjectDetails: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { project_id } = useParams<{ project_id: string }>();
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
   const [towers, setTowers] = useState<Tower[]>([]);
@@ -78,8 +67,8 @@ const ProjectDetails: React.FC = () => {
     const fetchProjectDetails = async () => {
       try {
         const [projectResponse, updatesResponse] = await Promise.all([
-          axiosInstance.get(`/api/projects/${id}`),
-          axiosInstance.get(`/api/projects/${id}/updates`)
+          axiosInstance.get(`/api/projects/${project_id}`),
+          axiosInstance.get(`/api/projects/${project_id}/updates`)
         ]);
         setProject(projectResponse.data.project);
         setConstructionUpdates(updatesResponse.data.updates);
@@ -91,7 +80,7 @@ const ProjectDetails: React.FC = () => {
     };
 
     fetchProjectDetails();
-  }, [id]);
+  }, [project_id]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -110,7 +99,7 @@ const ProjectDetails: React.FC = () => {
       formData.append('status', updateStatus);
 
       const response = await axiosInstance.post(
-        `/api/projects/${id}/updates`,
+        `/api/projects/${project_id}/updates`,
         formData,
         {
           headers: {
@@ -133,7 +122,7 @@ const ProjectDetails: React.FC = () => {
 
   const handleDeleteUpdate = async (updateId: number) => {
     try {
-      await axiosInstance.delete(`/api/projects/${id}/updates/${updateId}`);
+      await axiosInstance.delete(`/api/projects/${project_id}/updates/${updateId}`);
       setConstructionUpdates(prev => prev.filter(update => update.id !== updateId));
     } catch (err) {
       console.error('Error deleting update:', err);
@@ -164,7 +153,7 @@ const ProjectDetails: React.FC = () => {
   }
 
   const handleNavigation = (path: string) => {
-    navigate(`/projects/${id}/${path}`);
+    navigate(`/projects/${project_id}/${path}`);
   };
 
   return (
@@ -185,221 +174,142 @@ const ProjectDetails: React.FC = () => {
               color={project.status === 1 ? 'success' : 'error'}
             />
           </Box>
-          <Box sx={{ flex: 1, ml: 9, color: 'text.secondary' }}>
-            <Typography variant="body1">
+          <Box sx={{ flex: 1, ml: 9, color: 'text.secondary', mb:5 }}>
+            {/* <Typography variant="body1">
               {project.description}
-            </Typography>
+            </Typography> */}
           </Box>
         </Box>
       </Box>
 
-      <Box sx={{ mt: 4 }}>
-        <Box sx={{ 
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            sm: 'repeat(2, 1fr)',
-            md: 'repeat(4, 1fr)'
-          },
-          gap: 3
-        }}>
-          <Box>
-            <Card 
-              sx={{ 
-                height: '100%',
-                transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 3
-                }
-              }}
-            >
-              <CardActionArea onClick={() => handleNavigation('buildings')}>
-                <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                  <BusinessIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-                  <Typography variant="h6" gutterBottom>
-                    Buildings
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Manage project buildings
-                  </Typography>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Box>
-
-          <Box>
-            <Card 
-              sx={{ 
-                height: '100%',
-                transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 3
-                }
-              }}
-            >
-              <CardActionArea onClick={() => handleNavigation('towers')}>
-                <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                  <ApartmentIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-                  <Typography variant="h6" gutterBottom>
-                    Towers
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Manage project towers
-                  </Typography>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Box>
-
-          <Box>
-            <Card 
-              sx={{ 
-                height: '100%',
-                transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 3
-                }
-              }}
-            >
-              <CardActionArea onClick={() => handleNavigation('floors')}>
-                <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                  <LayersIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-                  <Typography variant="h6" gutterBottom>
-                    Floors
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Manage building floors
-                  </Typography>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Box>
-
-          <Box>
-            <Card 
-              sx={{ 
-                height: '100%',
-                transition: 'transform 0.2s',
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: 3
-                }
-              }}
-            >
-              <CardActionArea onClick={() => handleNavigation('units')}>
-                <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                  <HomeIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-                  <Typography variant="h6" gutterBottom>
-                    Units
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Manage floor units
-                  </Typography>
-                </CardContent>
-              </CardActionArea>
-            </Card>
-          </Box>
-        </Box>
-      </Box>
-
-      {/* Construction Updates Section */}
-      {/* <Box sx={{ mt: 6 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h5">Construction Updates</Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddPhotoAlternateIcon />}
-            onClick={() => setOpenUploadDialog(true)}
+      <Box sx={{ 
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: '1fr',
+          sm: 'repeat(2, 1fr)',
+          md: 'repeat(4, 1fr)'
+        },
+        gap: 3
+      }}>
+        <Box>
+          <Card 
+            sx={{ 
+              height: '100%',
+              transition: 'transform 0.2s',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 3
+              }
+            }}
           >
-            Add Update
-          </Button>
+            <CardActionArea onClick={() => handleNavigation('buildings')}>
+              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                <BusinessIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Project
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manage project
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
         </Box>
+        <Box>
+          <Card 
+            sx={{ 
+              height: '100%',
+              transition: 'transform 0.2s',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 3
+              }
+            }}
+          >
+            <CardActionArea onClick={() => handleNavigation('towers')}>
+              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                <ApartmentIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Towers
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manage project towers
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Box>
+        <Box>
+          <Card 
+            sx={{ 
+              height: '100%',
+              transition: 'transform 0.2s',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 3
+              }
+            }}
+          >
+            <CardActionArea onClick={() => handleNavigation('floors')}>
+              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                <LayersIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Floors
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manage building floors
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Box>
+        <Box>
+          <Card 
+            sx={{ 
+              height: '100%',
+              transition: 'transform 0.2s',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 3
+              }
+            }}
+          >
+            <CardActionArea onClick={() => handleNavigation('units')}>
+              <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                <HomeIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  Units
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Manage floor units
+                </Typography>
+              </CardContent>
+            </CardActionArea>
+          </Card>
+        </Box>
+      </Box>
 
-        <ImageList sx={{ width: '100%', height: 'auto' }} cols={3} rowHeight={300}>
-          {constructionUpdates.map((update) => (
-            <ImageListItem key={update.id}>
-              <img
-                src={update.image_url}
-                alt={update.name}
-                loading="lazy"
-                style={{ height: '100%', objectFit: 'cover' }}
-              />
-              <ImageListItemBar
-                title={update.name}
-                subtitle={`${new Date(update.updated_at).toLocaleDateString()} - ${update.status}`}
-                actionIcon={
-                  <IconButton
-                    sx={{ color: 'rgba(255, 255, 255, 0.54)' }}
-                    onClick={() => handleDeleteUpdate(update.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                }
-              />
-            </ImageListItem>
-          ))}
-        </ImageList>
-      </Box> */}
-
-      {/* Upload Dialog */}
-      {/* <Dialog open={openUploadDialog} onClose={() => setOpenUploadDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Construction Update</DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} sx={{ mt: 2 }}>
-            <Button
-              variant="outlined"
-              component="label"
-              startIcon={<AddPhotoAlternateIcon />}
-            >
-              Upload Image
-              <input
-                type="file"
-                hidden
-                accept="image/*"
-                onChange={handleFileSelect}
-              />
-            </Button>
-            {selectedFile && (
-              <Typography variant="body2">
-                Selected: {selectedFile.name}
+      {/* Amenities Section */}
+      <Box sx={{ mt: 6, mb: 2 }}>
+        <Typography variant="h5" color="Black">
+          Project Amenities
+        </Typography>
+      </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+        <Card sx={{ width: 320, transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 3 } }}>
+          <CardActionArea onClick={() => handleNavigation('amenities')}>
+            <CardContent sx={{ textAlign: 'center', py: 4 }}>
+              <SpaIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+              <Typography variant="h6" gutterBottom>
+                Amenities
               </Typography>
-            )}
-            <TextField
-              label="Name"
-              multiline
-              rows={3}
-              value={updateName}
-              onChange={(e) => setUpdateName(e.target.value)}
-            />
-            <TextField
-              select
-              label="Status"
-              value={updateStatus}
-              onChange={(e) => setUpdateStatus(e.target.value as 'completed' | 'in-progress' | 'planned')}
-              SelectProps={{
-                native: true
-              }}
-            >
-              <option value="planned">Planned</option>
-              <option value="in-progress">In Progress</option>
-              <option value="completed">Completed</option>
-            </TextField>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenUploadDialog(false)}>Cancel</Button>
-          <Button
-            onClick={handleUpload}
-            variant="contained"
-            disabled={!selectedFile || !updateName || uploading}
-          >
-            {uploading ? <CircularProgress size={24} /> : 'Upload'}
-          </Button>
-        </DialogActions>
-      </Dialog> */}
+              <Typography variant="body2" color="text.secondary">
+                Manage project amenities
+              </Typography>
+            </CardContent>
+          </CardActionArea>
+        </Card>
+      </Box>
     </Container>
   );
 };

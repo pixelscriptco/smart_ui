@@ -1,0 +1,63 @@
+.editor-container {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  /* padding: 12px; */
+  min-height: 150px;
+  background: #fff;
+}
+
+.editor-input {
+  min-height: 120px;
+  outline: none;
+  font-size: 16px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.editor-placeholder {
+  color: #999;
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+}
+
+.toolbar{
+  border: 1px solid #ccc;
+  padding: 5px;
+  border-top-right-radius: 4px;
+  border-top-left-radius: 4px;
+  background-color: #ccc;
+  display: flex;
+
+  .toolset{
+    border: 1px solid #ccc;
+    margin: 1px;
+    button{
+      border: none;
+      border-right: 1px solid #ccc;
+      padding-inline: 8px;
+      padding-block: 5px;
+    }
+  }
+}
+
+.editor-input strong {
+  font-weight: bold;
+}
+
+.editor-input em {
+  font-style: italic;
+}
+
+.editor-input u {
+  text-decoration: underline;
+}
+
+u {
+  text-decoration: underline;
+}
+
+button.active {
+  background-color: #d0d0ff;
+  border-radius: 4px;
+}

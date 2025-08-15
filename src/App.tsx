@@ -21,7 +21,8 @@ import TowerAmenities from './pages/TowerAmenities';
 import Floors from './pages/Floors';
 import FloorPlan from './pages/FloorPlan';
 import Units from './pages/Units';
-import UnitPlan from './pages/UnitPlan';
+import AddUnitPlan from './pages/AddUnitPlan';
+import UnitPlans from './pages/UnitPlans';
 import Clients from './pages/Clients';
 import Enquiries from './pages/Enquiries';
 import UnitDetails from './pages/UnitDetails';
@@ -98,7 +99,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/projects/:id"
+            path="/projects/:project_id"
             element={
               isAuthenticated ? (
                 <ProjectDetails />
@@ -138,7 +139,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/projects/:project_id/towers/:tower_id/amenities"
+            path="/projects/:project_id/amenities"
             element={
               isAuthenticated ? (
                 <TowerAmenities />
@@ -201,7 +202,17 @@ const AppRoutes = () => {
             path="/projects/:project_id/unit-plan"
             element={
               isAuthenticated ? (
-                <UnitPlan />
+                <AddUnitPlan />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/projects/:project_id/unit-plans"
+            element={
+              isAuthenticated ? (
+                <UnitPlans />
               ) : (
                 <Navigate to="/login" replace />
               )

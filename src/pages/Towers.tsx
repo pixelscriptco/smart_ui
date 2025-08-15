@@ -109,14 +109,14 @@ const Towers = () => {
                 >
                   Tower Details
                 </Button>
-                <Button 
+                {/* <Button 
                   size="small" 
                   color="secondary"
                   variant="outlined"
                   onClick={() => handleTowerAmenities(tower.id)}
                 >
                   Amenities
-                </Button>
+                </Button> */}
               </CardActions>
             </Card>
           </Box>

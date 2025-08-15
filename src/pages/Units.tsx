@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Typography, Paper, CircularProgress, Alert, InputLabel, Select, MenuItem, FormControl, SelectChangeEvent, Grid, Card, CardContent, Chip, Modal, List, ListItem, ListItemButton, ListItemText } from '@mui/material';
-import { Add as AddIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
+import { Box, Button, Typography, Paper, CircularProgress, Alert, InputLabel, Select, MenuItem, FormControl, SelectChangeEvent, Grid, Card, CardContent, Chip, Modal, List, ListItem, ListItemButton, ListItemText, Checkbox } from '@mui/material';
+import { Bungalow as BungalowIcon,Add as AddIcon, ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 import axiosInstance from '../utils/axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import './Units.css';
@@ -30,6 +30,7 @@ interface Unit {
   price: number;
   floor_id: string;
   floor_plan_id: string;
+  slug:string;
   unit_plans:UnitPlan;
 }
 
@@ -71,6 +72,9 @@ const Units: React.FC = () => {
   const [statusLoading, setStatusLoading] = useState<{ [unitId: string]: boolean }>({});
   const [loadingFloorPlans, setLoadingFloorPlans] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<UnitPlan | null>(null);
+  const [customUnitName, setCustomUnitName] = useState('');
+  const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
+  const [loadingAddPlanForSelected, setLoadingAddPlanForSelected] = useState(false);
   const navigate = useNavigate();
   const { project_id } = useParams();
 
@@ -163,6 +167,22 @@ const Units: React.FC = () => {
 
   const handleFloorChange = (event: SelectChangeEvent<string>) => {
     setSelectedFloor(event.target.value);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedUnits(units.map(unit => unit.id));
+    } else {
+      setSelectedUnits([]);
+    }
+  };
+
+  const handleUnitSelect = (unitId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedUnits(prev => [...prev, unitId]);
+    } else {
+      setSelectedUnits(prev => prev.filter(id => id !== unitId));
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -291,6 +311,9 @@ const Units: React.FC = () => {
       setFloorPlans(plansWithBase64Images);
       setShowFloorPlansModal(true);
       setSelectedUnitId(unitId);
+      // Set custom name to the current unit's name
+      const unit = units.find(u => u.id === unitId);
+      setCustomUnitName(unit?.slug || unit?.name || '');
     } catch (error) {
       console.error('Error fetching floor plans:', error);
       setError('Failed to fetch floor plans');
@@ -299,11 +322,12 @@ const Units: React.FC = () => {
     }
   };
 
-  const handleMapUnitPlan = async (unitId: string, planId: string) => {
+  const handleMapUnitPlan = async (unitId: string, planId: string, customName: string) => {
     try {
       await axiosInstance.post(`/api/floors/units/map-plan`, {
         unit_id: unitId,
-        unit_plan_id: planId
+        unit_plan_id: planId,
+        custom_name: customName
       });
       
       // Refresh the units list
@@ -322,7 +346,76 @@ const Units: React.FC = () => {
 
   const handleSavePlan = async () => {
     if (selectedUnitId && selectedPlan) {
-      await handleMapUnitPlan(selectedUnitId, selectedPlan.id.toString());
+      if (selectedUnitId === 'multiple') {
+        // Handle multiple units
+        try {
+          for (const unitId of selectedUnits) {
+            await handleMapUnitPlan(unitId, selectedPlan.id.toString(), customUnitName);
+          }
+          setSelectedUnits([]); // Clear selected units after adding
+          fetchUnits(); // Refresh units list
+          setShowFloorPlansModal(false);
+          setSelectedUnitId(null);
+          setSelectedPlan(null);
+          setCustomUnitName('');
+          setLoadingAddPlanForSelected(false);
+        } catch (error) {
+          console.error('Error mapping unit plans for multiple units:', error);
+          setError('Failed to map unit plans for selected units');
+          setLoadingAddPlanForSelected(false);
+        }
+      } else {
+        // Handle single unit (existing functionality)
+        await handleMapUnitPlan(selectedUnitId, selectedPlan.id.toString(), customUnitName);
+      }
+    }
+  };
+
+  const handleAddPlanForSelected = async () => {
+    if (selectedUnits.length === 0) return;
+
+    try {
+      setLoadingAddPlanForSelected(true);
+      setLoadingFloorPlans(true);
+      const response = await axiosInstance.get(`/api/projects/${project_id}/plans`);
+      
+      console.log(response);
+      
+      // Convert image URLs to base64 with compression
+      const plansWithBase64Images = await Promise.all(
+        response.data.plans.map(async (unitplan: UnitPlan) => {
+          if (unitplan.plan) {
+            try {
+              const imageResp = await fetch(unitplan.plan);
+              const imageBlob = await imageResp.blob();
+              
+              // Compress the image before converting to base64
+              const compressedBlob = await compressImage(imageBlob);
+              const imageBase64 = await convertBlobToBase64(compressedBlob);
+              
+              return {
+                ...unitplan,
+                plan: imageBase64
+              };
+            } catch (error) {
+              console.error('Error processing image:', error);
+              return unitplan;
+            }
+          }
+          return unitplan;
+        })
+      );
+
+      setFloorPlans(plansWithBase64Images);
+      setShowFloorPlansModal(true);
+      setSelectedUnitId('multiple'); // Special identifier for multiple units
+      setCustomUnitName('');
+    } catch (error) {
+      console.error('Error fetching floor plans:', error);
+      setError('Failed to fetch floor plans');
+    } finally {
+      setLoadingFloorPlans(false);
+      setLoadingAddPlanForSelected(false);
     }
   };
 
@@ -349,6 +442,14 @@ const Units: React.FC = () => {
           Manage Units
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
+        <Button
+            variant="contained"
+            color="primary"
+            startIcon={<BungalowIcon />}
+            onClick={() => navigate(`/projects/${project_id}/unit-plans`)}
+          >
+            List Unit Plans
+          </Button>
           <Button
             variant="contained"
             color="primary"
@@ -366,7 +467,7 @@ const Units: React.FC = () => {
         </Box>
       </Box>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
+      <Box sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
           <Box sx={{ flex: '1 1 300px', minWidth: 0 }}>
             <FormControl fullWidth>
@@ -436,7 +537,33 @@ const Units: React.FC = () => {
             <CircularProgress />
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'flex-start' }}>
+          <>
+            {units.length > 0 && (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Checkbox
+                    checked={selectedUnits.length === units.length && units.length > 0}
+                    indeterminate={selectedUnits.length > 0 && selectedUnits.length < units.length}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  />
+                  <Typography variant="body1" sx={{ ml: 1 }}>
+                    Select All ({selectedUnits.length} of {units.length} selected)
+                  </Typography>
+                </Box>
+                {selectedUnits.length > 0 && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={loadingAddPlanForSelected ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
+                    onClick={() => handleAddPlanForSelected()}
+                    disabled={selectedUnits.length === 0 || loadingAddPlanForSelected}
+                  >
+                    {loadingAddPlanForSelected ? 'Loading...' : `Add Unit Plan for Selected (${selectedUnits.length})`}
+                  </Button>
+                )}
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'flex-start' }}>
             {units.map((unit) => (
               <Box
                 key={unit.id}
@@ -450,9 +577,16 @@ const Units: React.FC = () => {
                 <Card>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                      <Typography variant="h6" component="div">
-                        {unit.name}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                        <Checkbox
+                          checked={selectedUnits.includes(unit.id)}
+                          onChange={(e) => handleUnitSelect(unit.id, e.target.checked)}
+                          sx={{ mr: 1 }}
+                        />
+                        {/* <Typography variant="h6" component="div">
+                          {unit.slug??unit.name}
+                        </Typography> */}
+                      </Box>
                       <FormControl size="small" sx={{ minWidth: 120 }}>
                         <Select
                           value={unit.unit_status.id}
@@ -494,6 +628,9 @@ const Units: React.FC = () => {
                         </Select>
                       </FormControl>
                     </Box>
+                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                      {unit.slug??unit.name}
+                    </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       Unit {unit.number}
                     </Typography>
@@ -511,6 +648,7 @@ const Units: React.FC = () => {
                         variant="outlined"
                         fullWidth
                         onClick={() => navigate(`/projects/${project_id}/units/${unit.id}`)}
+                        // disabled={unit.unit_plans}
                       >
                         View
                       </Button>
@@ -534,8 +672,9 @@ const Units: React.FC = () => {
               </Box>
             )}
           </Box>
+          </>
         )}
-      </Paper>
+      </Box>
 
       <Modal
         open={showFloorPlansModal}
@@ -543,6 +682,11 @@ const Units: React.FC = () => {
           setShowFloorPlansModal(false);
           setSelectedUnitId(null);
           setSelectedPlan(null);
+          setCustomUnitName('');
+          setLoadingAddPlanForSelected(false);
+          if (selectedUnitId === 'multiple') {
+            setSelectedUnits([]); // Clear selected units when closing modal for multiple units
+          }
         }}
         aria-labelledby="floor-plans-modal-title"
       >
@@ -561,8 +705,16 @@ const Units: React.FC = () => {
         }}>
           <Box sx={{ p: 4, borderBottom: 1, borderColor: 'divider' }}>
             <Typography id="floor-plans-modal-title" variant="h5" component="h2" gutterBottom sx={{ fontWeight: 'bold' }}>
-              Select Unit Plan
+              {selectedUnitId === 'multiple' 
+                ? `Select Unit Plan for ${selectedUnits.length} Selected Units`
+                : 'Select Unit Plan'
+              }
             </Typography>
+            {selectedUnitId === 'multiple' && (
+              <Typography variant="body2" color="text.secondary">
+                This plan will be applied to all {selectedUnits.length} selected units.
+              </Typography>
+            )}
           </Box>
 
           <Box sx={{ 
@@ -570,6 +722,26 @@ const Units: React.FC = () => {
             overflow: 'auto',
             flex: 1
           }}>
+            {/* Custom Name Field */}
+            <Box sx={{ mb: 2 }}>
+              <InputLabel htmlFor="custom-unit-name">
+                {selectedUnitId === 'multiple' ? 'Custom Name (will be applied to all selected units)' : 'Custom Name'}
+              </InputLabel>
+              <input
+                id="custom-unit-name"
+                type="text"
+                value={customUnitName}
+                onChange={e => setCustomUnitName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: 8,
+                  fontSize: 16,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+                placeholder={selectedUnitId === 'multiple' ? "Enter custom name for all selected units" : "Enter custom unit name"}
+              />
+            </Box>
             {loadingFloorPlans ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                 <CircularProgress />
@@ -655,7 +827,7 @@ const Units: React.FC = () => {
                                 Price
                               </Typography>
                               <Typography variant="body1" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-                                ${unitplan.cost}
+                                INR {unitplan.cost}
                               </Typography>
                             </Box>
                           </Box>
@@ -693,6 +865,11 @@ const Units: React.FC = () => {
                 setShowFloorPlansModal(false);
                 setSelectedUnitId(null);
                 setSelectedPlan(null);
+                setCustomUnitName('');
+                setLoadingAddPlanForSelected(false);
+                if (selectedUnitId === 'multiple') {
+                  setSelectedUnits([]); // Clear selected units when closing modal for multiple units
+                }
               }}
             >
               Cancel
@@ -702,7 +879,7 @@ const Units: React.FC = () => {
               onClick={handleSavePlan}
               disabled={!selectedPlan}
             >
-              Select
+              {selectedUnitId === 'multiple' ? `Apply to ${selectedUnits.length} Units` : 'Select'}
             </Button>
           </Box>
         </Box>

@@ -53,7 +53,6 @@ const TowerAmenities = () => {
     vr_url: '',
     image: null as File | null
   });
-  const [towerName, setTowerName] = useState('');
   const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
   const { project_id, tower_id } = useParams();
@@ -64,9 +63,8 @@ const TowerAmenities = () => {
 
   const fetchAmenities = async () => {
     try {
-      const response = await axiosInstance.get(`/api/towers/${tower_id}/amenities`);
-      setAmenities(response.data.tower.amenities);
-      setTowerName(response.data.tower.name);
+      const response = await axiosInstance.get(`/api/projects/${project_id}/amenities`);
+      setAmenities(response.data.amenities);
     } catch (err) {
       console.error('Error fetching amenities:', err);
       setError('Failed to load amenities');
@@ -106,7 +104,15 @@ const TowerAmenities = () => {
 
   const handleAddAmenity = async () => {
     if (!newAmenity.name.trim()) {
-      setError('Please enter an amenity name');
+      setError('Amenity name is required');
+      return;
+    }
+    if (!newAmenity.vr_url.trim()) {
+      setError('VR URL is required');
+      return;
+    }
+    if (!isEditing && !newAmenity.image) {
+      setError('Image is required');
       return;
     }
 
@@ -123,14 +129,14 @@ const TowerAmenities = () => {
       }
 
       if (isEditing && newAmenity.id) {
-        await axiosInstance.put(`/api/towers/${tower_id}/amenities/${newAmenity.id}`, formData, {
+        await axiosInstance.put(`/api/projects/${project_id}/amenities/${newAmenity.id}`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
         setSuccess('Amenity updated successfully');
       } else {
-        await axiosInstance.post(`/api/towers/${tower_id}/amenities`, formData, {
+        await axiosInstance.post(`/api/projects/${project_id}/amenities`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -193,7 +199,7 @@ const TowerAmenities = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, justifyContent: 'space-between'}}>
         <Typography variant="h4">
-          Amenities - Tower {towerName}
+          Amenities
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button
@@ -205,9 +211,9 @@ const TowerAmenities = () => {
           </Button>
           <Button
             startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(`/projects/${project_id}/towers`)}
+            onClick={() => navigate(`/projects/${project_id}`)}
           >
-            Back to Towers
+            Back to Project
           </Button>
         </Box>
       </Box>
@@ -234,77 +240,83 @@ const TowerAmenities = () => {
           minWidth: '300px'
         }
       }}>
-        {amenities.map((amenity) => (
-          <Card 
-            key={amenity.id}
-            sx={{ 
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              '&:hover': {
-                boxShadow: 6
-              }
-            }}
-          >
-            {amenity.image? (
-              <CardMedia
-                component="img"
-                height="200"
-                image={amenity.image}
-                alt={amenity.name}
-                sx={{ cursor: 'pointer' }}
-                src={amenity.image}
-                // onClick={() => handleViewImage(amenity.image_url)}
-              />
-            ) : (
-              <Box
-                sx={{
-                  height: 200,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  bgcolor: 'grey.100'
-                }}
-              >
-                <ViewIcon sx={{ fontSize: 60, color: 'grey.400' }} />
-              </Box>
-            )}
-            <CardContent sx={{ flexGrow: 1 }}>
-              <Typography variant="h6" gutterBottom>
-                {amenity.name}
-              </Typography>
-            </CardContent>
-            <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-              {amenity.vr_url && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => handleViewVR(amenity.vr_url)}
+        {amenities.length === 0 ? (
+          <Typography variant="body1" color="text.secondary" align="center" sx={{ width: '100%', py: 6 }}>
+            No Amenities are listed
+          </Typography>
+        ) : (
+          amenities.map((amenity) => (
+            <Card 
+              key={amenity.id}
+              sx={{ 
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                '&:hover': {
+                  boxShadow: 6
+                }
+              }}
+            >
+              {amenity.image? (
+                <CardMedia
+                  component="img"
+                  height="200"
+                  image={amenity.image}
+                  alt={amenity.name}
+                  sx={{ cursor: 'pointer' }}
+                  src={amenity.image}
+                  // onClick={() => handleViewImage(amenity.image_url)}
+                />
+              ) : (
+                <Box
+                  sx={{
+                    height: 200,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'grey.100'
+                  }}
                 >
-                  View VR Tour
-                </Button>
+                  <ViewIcon sx={{ fontSize: 60, color: 'grey.400' }} />
+                </Box>
               )}
-              <Box display="flex" gap={0}>
-                <Tooltip title="Edit Amenity">
-                  <IconButton 
-                    color="primary" 
-                    onClick={() => handleEditAmenity(amenity)}
+              <CardContent sx={{ flexGrow: 1 }}>
+                <Typography variant="h6" gutterBottom>
+                  {amenity.name}
+                </Typography>
+              </CardContent>
+              <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+                {amenity.vr_url && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleViewVR(amenity.vr_url)}
                   >
-                    <EditIcon />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete Amenity">
-                  <IconButton
-                    color="error"
-                    onClick={() => handleDeleteClick(amenity.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </CardActions>
-          </Card>
-        ))}
+                    View VR Tour
+                  </Button>
+                )}
+                <Box display="flex" gap={0}>
+                  <Tooltip title="Edit Amenity">
+                    <IconButton 
+                      color="primary" 
+                      onClick={() => handleEditAmenity(amenity)}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete Amenity">
+                    <IconButton
+                      color="error"
+                      onClick={() => handleDeleteClick(amenity.id)}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </CardActions>
+            </Card>
+          ))
+        )}
       </Box>
 
       {/* Add/Edit Amenity Modal */}
@@ -334,12 +346,17 @@ const TowerAmenities = () => {
               onChange={(e) => setNewAmenity(prev => ({ ...prev, name: e.target.value }))}
               required
               fullWidth
+              error={Boolean(error) && !newAmenity.name.trim()}
+              helperText={Boolean(error) && !newAmenity.name.trim() ? 'Name is required' : ''}
             />
             <TextField
               label="VR URL"
               value={newAmenity.vr_url}
               onChange={(e) => setNewAmenity(prev => ({ ...prev, vr_url: e.target.value }))}
+              required
               fullWidth
+              error={Boolean(error) && !newAmenity.vr_url.trim()}
+              helperText={Boolean(error) && !newAmenity.vr_url.trim() ? 'VR URL is required' : ''}
               placeholder="https://example.com/vr-tour"
             />
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -355,6 +372,7 @@ const TowerAmenities = () => {
                   variant="outlined"
                   component="span"
                   startIcon={<CloudUploadIcon />}
+                  color={'primary'}
                 >
                   {isEditing ? 'Change Image' : 'Upload Image'}
                 </Button>
@@ -364,6 +382,11 @@ const TowerAmenities = () => {
                   {newAmenity.image.name}
                 </Typography>
               )}
+              {/* {!isEditing && !newAmenity.image && (
+                <Typography variant="body2" color="error">
+                  Image is required
+                </Typography>
+              )} */}
             </Box>
           </Box>
         </DialogContent>
@@ -377,13 +400,14 @@ const TowerAmenities = () => {
               vr_url: '',
               image: null
             });
+            setError(null);
           }}>
             Cancel
           </Button>
           <Button
             variant="contained"
             onClick={handleAddAmenity}
-            disabled={uploading || !newAmenity.name.trim()}
+            disabled={uploading || !newAmenity.name.trim() || !newAmenity.vr_url.trim() || (!isEditing && !newAmenity.image)}
             startIcon={uploading ? <CircularProgress size={20} /> : null}
           >
             {uploading ? (isEditing ? 'Updating...' : 'Adding...') : (isEditing ? 'Update' : 'Add')} Amenity

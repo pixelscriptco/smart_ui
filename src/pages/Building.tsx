@@ -47,8 +47,22 @@ const InteractiveImageUploader = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
-        setImageSrc(reader.result as string);
-        setIsExistingBuilding(false); // Reset to false for new uploads
+        const img = new window.Image();
+        img.onload = () => {
+          if (img.width === 4000 && img.height === 2250) {
+            setImageSrc(reader.result as string);
+            setIsExistingBuilding(false); // Reset to false for new uploads
+            setError(null);
+          } else {
+            setError('Image must be exactly 4000 x 2250 pixels.');
+            setImageSrc(null);
+          }
+        };
+        img.onerror = () => {
+          setError('Invalid image file.');
+          setImageSrc(null);
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -75,6 +89,10 @@ const InteractiveImageUploader = () => {
       
       try {
         const response = await axiosInstance.get(`/api/buildings/${project_id}`);
+        if(response.data.buildings.length === 0) {
+          setIsExistingBuilding(false);
+          return;
+        }
         const { name, image_url, svg_url } = response.data.buildings[0];
 
         setBuildingName(name);
@@ -236,7 +254,7 @@ const InteractiveImageUploader = () => {
   };
 
   const handleShapeClick = (id: number) => {
-    const name = prompt("Enter name for this area:");
+    const name = prompt("Enter name for this tower:");
     if (name) {
       setShapes((prevShapes) =>
         prevShapes.map((shape) =>
@@ -255,6 +273,19 @@ const InteractiveImageUploader = () => {
   const handleMouseOut = () => {
     setHoveredName(null);
   };
+
+  const getDistancesFromSides = (
+    point: { x: number; y: number },
+    imageWidth: number,
+    imageHeight: number
+  ) => {
+    return {
+      left: point.x,
+      right: imageWidth - point.x,
+      top: point.y,
+      bottom: imageHeight - point.y,
+    };
+  }
 
   const handleSave = async () => {
     if (!imageSrc || !svgRef.current) {
@@ -277,11 +308,35 @@ const InteractiveImageUploader = () => {
       
       // Get SVG data
       const svgElement = svgRef.current;
+      const svgWidth = 4000; // Your image is always 4000x2250
+      const svgHeight = 2250;
+
+
+      svgElement.querySelectorAll('desc[data-distance]').forEach(desc => desc.remove());
+
+      // For each shape, add a <desc> tag with distances
+      shapes.forEach(shape => {
+        let point: { x: number; y: number };
+        if (shape.type === 'polygon' || shape.type === 'line') {
+          point = shape.points[0];
+        } else {
+          point = shape.points[0];
+        }
+        const distances = getDistancesFromSides(point, svgWidth, svgHeight);
+
+        // Find the SVG element by id (name)
+        const el = svgElement.querySelector(`#${CSS.escape(shape.name || '')}`);
+        if (el) {
+          const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
+          desc.setAttribute('data-distance', 'true');
+          desc.textContent = `left:${distances.left},right:${distances.right},top:${distances.top},bottom:${distances.bottom}`;
+          el.appendChild(desc);
+        }
+      });
+
+      // Get SVG data
       const svgString = new XMLSerializer().serializeToString(svgElement);
       const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
-      // const pathIds = Array.from(svgElement.querySelectorAll('path'))
-      //                  .map(el => el.id)
-      //                  .filter(Boolean);         
       
       // Create form data
       const formData = new FormData();
@@ -301,9 +356,9 @@ const InteractiveImageUploader = () => {
 
       setSuccess('Building saved successfully');
       // Reset form after successful save
-      setBuildingName('');
-      setShapes([]);
-      setImageSrc(null);
+      // setBuildingName('');
+      // setShapes([]);
+      // setImageSrc(null);
     } catch (err: any) {
       console.error('Save error:', err);
       setError(err.response?.data?.message || 'Error saving building');
@@ -397,7 +452,7 @@ const InteractiveImageUploader = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 60}}>
         <Typography variant="h4">
-          Manage Building Details
+          Manage Project Details
         </Typography>
         <Button
           // variant="outlined"
@@ -437,7 +492,7 @@ const InteractiveImageUploader = () => {
             </Button>
           </label>
 
-          <ToggleButtonGroup
+          {/* <ToggleButtonGroup
             value={drawMode}
             exclusive
             onChange={(e, value) => {
@@ -454,7 +509,7 @@ const InteractiveImageUploader = () => {
             <ToggleButton value="rectangle" aria-label="draw rectangle">
               <RectangleIcon />
             </ToggleButton>
-          </ToggleButtonGroup>
+          </ToggleButtonGroup> */}
 
           <Tooltip title="Undo last action">
             <IconButton 
@@ -563,6 +618,7 @@ const InteractiveImageUploader = () => {
 
       <NameFloorInputModal
         isOpen={isNameModalOpen}
+        title='Enter tower details'
         onClose={() => {
           setIsNameModalOpen(false);
           setPendingPolygon([]);

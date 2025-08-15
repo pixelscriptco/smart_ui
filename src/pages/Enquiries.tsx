@@ -28,7 +28,7 @@ import axiosInstance from '../utils/axios';
 interface Enquiry {
   id: string;
   project: { name: string };
-  unit: { name: string };
+  unit: { name: string,slug:string };
   first_name: string;
   last_name: string;
   email: string;
@@ -178,7 +178,7 @@ const Enquiries: React.FC = () => {
                   enquiries.map((enquiry) => (
                     <TableRow key={enquiry.id}>
                       <TableCell>{enquiry.project?.name}</TableCell>
-                      <TableCell>{enquiry.unit?.name}</TableCell>
+                      <TableCell>{enquiry.unit?.slug??enquiry.unit?.name}</TableCell>
                       <TableCell>{enquiry.first_name} {enquiry.last_name}</TableCell>
                       <TableCell>{enquiry.email}</TableCell>
                       <TableCell>{enquiry.mobile}</TableCell>
@@ -191,8 +191,8 @@ const Enquiries: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={enquiry.type.charAt(0).toUpperCase() + enquiry.type.slice(1)}
-                          color={typeColors[enquiry.type] || 'info'}
+                          label={enquiry.type ? enquiry.type.charAt(0).toUpperCase() + enquiry.type.slice(1) : 'Warm'}
+                          color={enquiry.type && typeColors[enquiry.type] ? typeColors[enquiry.type] : 'info'}
                           size="small"
                         />
                       </TableCell>

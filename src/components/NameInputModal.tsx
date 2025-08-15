@@ -4,12 +4,14 @@ import Modal from './Modal';
 
 interface NameInputModalProps {
   isOpen: boolean;
+  title: string;
   onClose: () => void;
   onSubmit: (name: string, floorCount: number) => void;
 }
 
 const NameInputModal: React.FC<NameInputModalProps> = ({
   isOpen,
+  title,
   onClose,
   onSubmit,
 }) => {
@@ -27,7 +29,7 @@ const NameInputModal: React.FC<NameInputModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Enter name for this area"
+      title={title}
       onSubmit={handleSubmit}
       submitText="Save"
     >

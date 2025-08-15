@@ -36,8 +36,10 @@ import {
   Grid
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon, Search as SearchIcon } from '@mui/icons-material';
+import RoomIcon from '@mui/icons-material/Room';
 import axiosInstance from '../utils/axios';
-
+import LexicalEditor from '../components/LexicalEditor';
+import {MapPicker} from '../components/MapPicker';
 interface User {
   company: string;
 }
@@ -54,6 +56,7 @@ interface Project {
   User: User;
   created_at: string;
   updated_at: string;
+  location?: string;
 }
 
 interface Company {
@@ -68,6 +71,9 @@ interface ProjectFormData {
   status: number;
   logo: File | null;
   company_id: number;
+  registration_number?: string;
+  qr_code?: File | null;
+  location?: string;
 }
 
 const Projects: React.FC = () => {
@@ -82,9 +88,13 @@ const Projects: React.FC = () => {
     project_url: '',
     status: 1,
     logo: null,
-    company_id: 0
+    company_id: 0,
+    registration_number: '',
+    qr_code: null,
+    location: ''
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [qrCodePreview, setQrCodePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -94,7 +104,12 @@ const Projects: React.FC = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const editor_theme = {
+    paragraph: 'editor-paragraph',
+  };
 
+  
   useEffect(() => {
     fetchProjects();
     fetchCompanies();
@@ -103,7 +118,8 @@ const Projects: React.FC = () => {
   useEffect(() => {
     const filtered = projects.filter(project => 
       project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.User.company.toLowerCase().includes(searchTerm.toLowerCase())
+      project.User.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (project.location && project.location.toLowerCase().includes(searchTerm.toLowerCase()))
     );
     setFilteredProjects(filtered);
   }, [projects, searchTerm]);
@@ -143,9 +159,13 @@ const Projects: React.FC = () => {
         project_url: project.project_url,
         status: project.status,
         logo: null,
-        company_id: project.user_id
+        company_id: project.user_id,
+        registration_number: (project as any).registration_number || '',
+        qr_code: null,
+        location: (project as any).location || ''
       });
       setLogoPreview(project.logo || null);
+      setQrCodePreview((project as any).qr_code || null);
     } else {
       setIsEditing(false);
       setCurrentProjectId(null);
@@ -155,9 +175,13 @@ const Projects: React.FC = () => {
         project_url:'',
         status: 1,
         logo: null,
-        company_id: 0
+        company_id: 0,
+        registration_number: '',
+        qr_code: null,
+        location: ''
       });
       setLogoPreview(null);
+      setQrCodePreview(null);
     }
     setOpen(true);
   };
@@ -171,9 +195,13 @@ const Projects: React.FC = () => {
       project_url:'',
       status: 1,
       logo: null,
-      company_id: 0
+      company_id: 0,
+      registration_number: '',
+      qr_code: null,
+      location: ''
     });
     setLogoPreview(null);
+    setQrCodePreview(null);
     setIsEditing(false);
     setCurrentProjectId(null);
   };
@@ -204,19 +232,49 @@ const Projects: React.FC = () => {
     }
   };
 
+  const handleQrCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData(prev => ({
+        ...prev,
+        qr_code: file
+      }));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setQrCodePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
     setLoading(true);
-
+    console.log(coordinates);
+    
     const formDataToSend = new FormData();
     formDataToSend.append('name', formData.name);
     formDataToSend.append('description', formData.description);
     formDataToSend.append('project_url', formData.project_url);
     formDataToSend.append('status', formData.status === 1 ? '1' : '0');
     formDataToSend.append('company_id', formData.company_id.toString());
+    formDataToSend.append('registration_number', formData.registration_number || '');
+    if (coordinates) {
+      formDataToSend.append('latitude', JSON.stringify(coordinates.lat));
+      formDataToSend.append('longitude', JSON.stringify(coordinates.lng));
+    } else {
+      formDataToSend.append('latitude', '');
+      formDataToSend.append('longitude', '');
+    }
     if (formData.logo) {
       formDataToSend.append('logo', formData.logo);
+    }
+    if (formData.qr_code) {
+      formDataToSend.append('qr_code', formData.qr_code);
+    }
+    if (formData.location) {
+      formDataToSend.append('location', formData.location);
     }
 
     try {
@@ -343,7 +401,7 @@ const Projects: React.FC = () => {
         <Box sx={{ mb: 3 }}>
           <TextField
             fullWidth
-            placeholder="Search by project name or company..."
+            placeholder="Search by project name, company, or location..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -379,7 +437,7 @@ const Projects: React.FC = () => {
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Logo</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
+                {/* <TableCell sx={{ fontWeight: 600 }}>Description</TableCell> */}
                 <TableCell sx={{ fontWeight: 600 }}>Url</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Created At</TableCell>
@@ -408,7 +466,7 @@ const Projects: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.User.company}</TableCell>
-                      <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.description}</TableCell>
+                      {/* <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.description}</TableCell> */}
                       <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.url}</TableCell>
                       {/* <TableCell onClick={() => navigate(`/projects/${project.id}`)}>
                         <Chip 
@@ -449,7 +507,7 @@ const Projects: React.FC = () => {
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete">
+                        {/* <Tooltip title="Delete">
                           <IconButton 
                             color="error" 
                             size="small"
@@ -457,7 +515,7 @@ const Projects: React.FC = () => {
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
-                        </Tooltip>
+                        </Tooltip> */}
                       </TableCell>
                     </TableRow>
                   ))
@@ -485,7 +543,9 @@ const Projects: React.FC = () => {
             {isEditing ? 'Edit Project' : 'Add New Project'}
           </DialogTitle>
           <DialogContent>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+            {/* Logo and QR code upload side by side */}
+            <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, mb: 3 }}>
+              {/* Logo upload */}
               <Box
                 component="label"
                 htmlFor="logo-upload"
@@ -503,7 +563,7 @@ const Projects: React.FC = () => {
                     width: 100,
                     height: 100,
                     bgcolor: logoPreview ? 'transparent' : theme.palette.primary.main,
-                    mb: 2,
+                    mb: 1,
                     border: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                     '& img': { objectFit: 'cover' }
                   }}
@@ -529,19 +589,82 @@ const Projects: React.FC = () => {
                 >
                   <UploadIcon sx={{ color: 'white', fontSize: 30 }} />
                 </Box>
+                <input
+                  id="logo-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  style={{ display: 'none' }}
+                />
+                <Typography variant="body2" color="text.secondary" align="center">
+                  Logo*
+                </Typography>
               </Box>
-              <input
-                id="logo-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleLogoChange}
-                style={{ display: 'none' }}
-              />
-              <Typography variant="body2" color="text.secondary">
-                Click to upload project logo*
-              </Typography>
+              {/* QR Code upload */}
+              <Box
+                component="label"
+                htmlFor="qr-code-upload"
+                sx={{
+                  cursor: 'pointer',
+                  position: 'relative',
+                  '&:hover .upload-overlay': {
+                    opacity: 1
+                  }
+                }}
+              >
+                <Avatar
+                  src={qrCodePreview || undefined}
+                  sx={{
+                    width: 100,
+                    height: 100,
+                    bgcolor: qrCodePreview ? 'transparent' : theme.palette.primary.main,
+                    mb: 1,
+                    border: `2px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                    '& img': { objectFit: 'cover' }
+                  }}
+                >
+                  {!qrCodePreview && <UploadIcon sx={{ fontSize: 40 }} />}
+                </Avatar>
+                <Box
+                  className="upload-overlay"
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: alpha(theme.palette.primary.main, 0.7),
+                    borderRadius: '50%',
+                    opacity: 0,
+                    transition: 'opacity 0.2s'
+                  }}
+                >
+                  <UploadIcon sx={{ color: 'white', fontSize: 30 }} />
+                </Box>
+                <input
+                  id="qr-code-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleQrCodeChange}
+                  style={{ display: 'none' }}
+                />
+                <Typography variant="body2" color="text.secondary" align="center">
+                  QR Code
+                </Typography>
+              </Box>
             </Box>
-
+            {/* Registration Number */}
+            <TextField
+              fullWidth
+              label="Registration Number"
+              name="registration_number"
+              value={formData.registration_number}
+              onChange={handleInputChange}
+              sx={{ mb: 2 }}
+            />
             <Box sx={{
               display: 'flex',
               flexDirection: 'column',
@@ -583,15 +706,13 @@ const Projects: React.FC = () => {
                 value={formData.project_url}
                 onChange={handleInputChange}
               />
-              <TextField
-                fullWidth
-                label="Description"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                multiline
-                rows={4}
+              <LexicalEditor onChange={(html) => setFormData(prev => ({ ...prev, description: html }))} />
+              <MapPicker
+                coordinates={coordinates}
+                setCoordinates={setCoordinates}
+                setFormData={setFormData}
               />
+
             </Box>
           </DialogContent>
           <DialogActions>

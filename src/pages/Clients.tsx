@@ -19,7 +19,14 @@ import {
   TablePagination,
   Avatar,
   Switch,
-  FormControlLabel
+  FormControlLabel,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
+  Tooltip
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -29,7 +36,8 @@ import {
   Person as PersonIcon
 } from '@mui/icons-material';
 import axiosInstance from '../utils/axios';
-
+import LockResetIcon from '@mui/icons-material/LockReset';
+import CheckIcon from '@mui/icons-material/Check';
 interface Client {
   id: number;
   name: string;
@@ -53,10 +61,44 @@ const Clients = () => {
   });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [newClient, setNewClient] = useState({
+    name: '',
+    email: '',
+    mobile: '',
+    company: '',
+    password:'',
+    status: 'active',
+  });
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [password, setPassword] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState<number>(0);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [mobileError, setMobileError] = useState<string | null>(null);
+  const [emailValidationTimeout, setEmailValidationTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [mobileValidationTimeout, setMobileValidationTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [emailValidating, setEmailValidating] = useState(false);
+  const [mobileValidating, setMobileValidating] = useState(false);
 
   useEffect(() => {
     fetchClients();
   }, []);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (emailValidationTimeout) {
+        clearTimeout(emailValidationTimeout);
+      }
+      if (mobileValidationTimeout) {
+        clearTimeout(mobileValidationTimeout);
+      }
+    };
+  }, [emailValidationTimeout, mobileValidationTimeout]);
 
   const fetchClients = async () => {
     try {
@@ -96,16 +138,6 @@ const Clients = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const handleEdit = (clientId: number) => {
-    // Implement edit functionality
-    console.log('Edit client:', clientId);
-  };
-
-  const handleDelete = (clientId: number) => {
-    // Implement delete functionality
-    console.log('Delete client:', clientId);
-  };
-
   const handleStatusChange = async (clientId: number, newStatus: 'active' | 'inactive') => {
     try {
       // Update the status in the backend
@@ -127,11 +159,384 @@ const Clients = () => {
     }
   };
 
+  const handleCreateClient = async () => {
+    setCreateError(null);
+    
+    // Check for validation errors
+    if (emailError || mobileError) {
+      setCreateError('Please fix the validation errors before creating the client');
+      return;
+    }
+    
+    try {
+      const response = await axiosInstance.post('/api/users/client', newClient);
+      setCreateModalOpen(false);
+      setNewClient({ name: '', email: '', mobile: '', company: '', password: '', status: 'active' });
+      setEmailError(null);
+      setMobileError(null);
+      fetchClients();
+    } catch (err: any) {
+      setCreateError(err.response?.data?.message || 'Failed to create client');
+    }
+  };
+
+  const handleEdit = (clientId: number) => {
+    const client = clients.find(c => c.id === clientId);
+    if (client) {
+      setEditingClient(client);
+      setEditModalOpen(true);
+    }
+  };
+
+  const handleResetClick = (clientId: number) => {
+    setSelectedClientId(clientId);
+    setIsSuccess(false);
+    setPassword('');
+    setResetModalOpen(true);
+  };
+
+  const handleResetPassword = (clientId: number) => {
+    // setResetModalOpen(true);
+    if (password) {
+      axiosInstance
+        .patch(`/api/users/clients/${clientId}/reset-password`, {
+          password: password
+        })
+        .then(() => {
+          setIsSuccess(true);
+          setTimeout(() => setResetModalOpen(false), 2000); 
+        })
+        .catch((err) => {
+          setResetModalOpen(false);
+          console.error('Failed to reset password:', err);
+          // alert('Failed to reset password');
+        });
+    }
+  };
+
+  const validateEmail = async (email: string) => {
+    if (!email) {
+      setEmailError(null);
+      setEmailValidating(false);
+      return;
+    }
+    
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email address');
+      setEmailValidating(false);
+      return;
+    }
+    
+    // Clear previous timeout
+    if (emailValidationTimeout) {
+      clearTimeout(emailValidationTimeout);
+    }
+    
+    // Set new timeout for debouncing
+    const timeout = setTimeout(async () => {
+      setEmailValidating(true);
+      try {
+        const response = await axiosInstance.get(`/api/users/check-client-exists?email=${encodeURIComponent(email)}`);
+        if (response.data.exists && response.data.errors.email) {
+          setEmailError(response.data.errors.email);
+        } else {
+          setEmailError(null);
+        }
+      } catch (error) {
+        console.error('Error checking email:', error);
+        setEmailError(null);
+      } finally {
+        setEmailValidating(false);
+      }
+    }, 500); // 500ms delay
+    
+    setEmailValidationTimeout(timeout);
+  };
+
+  const validateMobile = async (mobile: string) => {
+    if (!mobile) {
+      setMobileError(null);
+      setMobileValidating(false);
+      return;
+    }
+    
+    // Basic mobile number validation (at least 10 digits)
+    if (mobile.length < 10) {
+      setMobileError('Mobile number must be at least 10 digits');
+      setMobileValidating(false);
+      return;
+    }
+    
+    // Clear previous timeout
+    if (mobileValidationTimeout) {
+      clearTimeout(mobileValidationTimeout);
+    }
+    
+    // Set new timeout for debouncing
+    const timeout = setTimeout(async () => {
+      setMobileValidating(true);
+      try {
+        const response = await axiosInstance.get(`/api/users/check-client-exists?mobile=${encodeURIComponent(mobile)}`);
+        if (response.data.exists && response.data.errors.mobile) {
+          setMobileError(response.data.errors.mobile);
+        } else {
+          setMobileError(null);
+        }
+      } catch (error) {
+        console.error('Error checking mobile:', error);
+        setMobileError(null);
+      } finally {
+        setMobileValidating(false);
+      }
+    }, 500); // 500ms delay
+    
+    setMobileValidationTimeout(timeout);
+  };
+  
+
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom sx={{ mb: 4 }}>
-        Clients
-      </Typography>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Clients
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => {
+            setCreateModalOpen(true);
+            setEmailError(null);
+            setMobileError(null);
+            setCreateError(null);
+            setEmailValidating(false);
+            setMobileValidating(false);
+          }}
+        >
+          Create New Client
+        </Button>
+      </Box>
+
+      {/* Create Client Modal */}
+      <Dialog 
+        open={createModalOpen} 
+        onClose={() => {
+          setCreateModalOpen(false);
+          setEmailError(null);
+          setMobileError(null);
+          setCreateError(null);
+          setEmailValidating(false);
+          setMobileValidating(false);
+        }} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>Create New Client</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+          {createError && (
+            <Typography color="error" sx={{ mb: 1 }}>{createError}</Typography>
+          )}
+          <TextField
+            label="Name"
+            value={newClient.name}
+            onChange={e => setNewClient({ ...newClient, name: e.target.value })}
+            fullWidth
+          />
+          <TextField
+            label="Email"
+            value={newClient.email}
+            onChange={e => {
+              setNewClient({ ...newClient, email: e.target.value });
+              validateEmail(e.target.value);
+            }}
+            onBlur={(e) => validateEmail(e.target.value)}
+            error={!!emailError}
+            helperText={emailError}
+            fullWidth
+            InputProps={{
+              endAdornment: emailValidating ? (
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+              ) : null
+            }}
+          />
+          <TextField
+            label="Mobile"
+            value={newClient.mobile}
+            onChange={e => {
+              setNewClient({ ...newClient, mobile: e.target.value });
+              validateMobile(e.target.value);
+            }}
+            onBlur={(e) => validateMobile(e.target.value)}
+            error={!!mobileError}
+            helperText={mobileError}
+            fullWidth
+            InputProps={{
+              endAdornment: mobileValidating ? (
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+              ) : null
+            }}
+          />
+          <TextField
+            label="Company"
+            value={newClient.company}
+            onChange={e => setNewClient({ ...newClient, company: e.target.value })}
+            fullWidth
+          />
+          <TextField
+            label="Password"
+            value={newClient.password}
+            onChange={e => setNewClient({ ...newClient, password: e.target.value })}
+            fullWidth
+          />
+          <FormControl fullWidth>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={newClient.status}
+              label="Status"
+              onChange={e => setNewClient({ ...newClient, status: e.target.value })}
+            >
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
+          <Tooltip 
+            title={
+              emailError || mobileError 
+                ? 'Please fix the validation errors before creating the client'
+                : !newClient.name || !newClient.email || !newClient.mobile || !newClient.password
+                ? 'Please fill in all required fields'
+                : emailValidating || mobileValidating
+                ? 'Validating...'
+                : ''
+            }
+          >
+            <span>
+              <Button 
+                variant="contained" 
+                onClick={handleCreateClient}
+                disabled={
+                  !!emailError || 
+                  !!mobileError || 
+                  !newClient.name || 
+                  !newClient.email || 
+                  !newClient.mobile || 
+                  !newClient.password ||
+                  emailValidating ||
+                  mobileValidating
+                }
+              >
+                Create
+              </Button>
+            </span>
+          </Tooltip>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={editModalOpen} onClose={() => setEditModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Client</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+          {editingClient && (
+            <>
+              <TextField
+                label="Name"
+                value={editingClient.name}
+                onChange={e =>
+                  setEditingClient({ ...editingClient, name: e.target.value })
+                }
+                fullWidth
+              />
+              <TextField
+                label="Email"
+                value={editingClient.email}
+                disabled
+                fullWidth
+                sx={{
+                  '& .MuiInputBase-input.Mui-disabled': {
+                    WebkitTextFillColor: 'rgba(0, 0, 0, 0.6)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                  }
+                }}
+              />
+              <TextField
+                label="Mobile"
+                value={editingClient.mobile}
+                onChange={e =>
+                  setEditingClient({ ...editingClient, mobile: e.target.value })
+                }
+                fullWidth
+              />
+              <TextField
+                label="Company"
+                value={editingClient.company}
+                onChange={e =>
+                  setEditingClient({ ...editingClient, company: e.target.value })
+                }
+                fullWidth
+              />
+              <FormControl fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={editingClient.status}
+                  label="Status"
+                  onChange={e =>
+                    setEditingClient({
+                      ...editingClient,
+                      status: e.target.value as 'active' | 'inactive'
+                    })
+                  }
+                >
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                </Select>
+              </FormControl>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditModalOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              try {
+                if (editingClient) {
+                  await axiosInstance.patch(`/api/users/clients/${editingClient.id}`, editingClient);
+                  fetchClients(); // refresh
+                  setEditModalOpen(false);
+                }
+              } catch (err) {
+                console.error("Failed to update client", err);
+              }
+            }}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={resetModalOpen} onClose={() => setResetModalOpen(false)}  maxWidth="sm" fullWidth>
+        <DialogTitle>Reset Password</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="New Password"
+            type="password"
+            fullWidth
+            variant="outlined"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResetModalOpen(false)}>Cancel</Button>
+          <Button onClick={() => handleResetPassword(selectedClientId)} variant="contained" color="primary">{isSuccess ? <CheckIcon /> : 'Submit'}</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 4 }}>
@@ -278,11 +683,11 @@ const Clients = () => {
                           <EditIcon />
                         </IconButton>
                         <IconButton 
-                          size="small" 
-                          onClick={() => handleDelete(client.id)}
-                          color="error"
-                        >
-                          <DeleteIcon />
+                            size="small" 
+                            onClick={() => handleResetClick(client.id)}
+                            color="secondary"
+                          >
+                            <LockResetIcon />
                         </IconButton>
                       </TableCell>
                     </TableRow>

@@ -504,11 +504,11 @@ const InteractiveImageUploader = () => {
       formData.append('tower_id', tower_id as string);
       formData.append('direction', direction);
 
-      // await axiosInstance.post('/api/towers', formData, {
-      //   headers: {
-      //     'Content-Type': 'multipart/form-data',
-      //   },
-      // });
+      await axiosInstance.post('/api/towers', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       setSuccess('Tower saved successfully');
       // Reset form after successful save
@@ -886,7 +886,7 @@ const InteractiveImageUploader = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 60}}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 55}}>
         <Typography variant="h4">
           Manage Tower Details - {towerName}
         </Typography>

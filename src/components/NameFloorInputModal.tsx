@@ -34,16 +34,19 @@ const NameFloorInputModal: React.FC<NameInputModalProps> = ({
       onSubmit={handleSubmit}
       submitText="Save"
     >
+      <label htmlFor="Tower Name" style={{color:'White'}}>Tower Name</label>
       <input
         type="text"
+        style={{ marginTop : 1 }}
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Area name"
         className="modal-input"
       />
-
+      <label htmlFor="Number of floors" style={{color:'White'}}>Number of floors</label>
       <input
         type="number"
+        style={{ marginTop : 1 }}
         value={floorCount}
         onChange={(e) => setFloorCount(parseInt(e.target.value))}
         placeholder="Number of floors"

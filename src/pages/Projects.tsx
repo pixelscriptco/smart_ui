@@ -35,13 +35,14 @@ import {
   FormControlLabel,
   Grid
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon, Search as SearchIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon, Search as SearchIcon,ContentCopy as ContentCopyIcon } from '@mui/icons-material';
 import RoomIcon from '@mui/icons-material/Room';
 import axiosInstance from '../utils/axios';
 import LexicalEditor from '../components/LexicalEditor';
 import {MapPicker} from '../components/MapPicker';
 interface User {
   company: string;
+  url:string
 }
 interface Project {
   id: number;
@@ -507,6 +508,15 @@ const Projects: React.FC = () => {
                             <EditIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="Copy Project URL">
+                          <IconButton 
+                            color="primary" 
+                            size="small"
+                            onClick={() => navigator.clipboard.writeText(project.User.url+'/'+project.url)}
+                          >
+                            <ContentCopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         {/* <Tooltip title="Delete">
                           <IconButton 
                             color="error" 
@@ -657,14 +667,14 @@ const Projects: React.FC = () => {
               </Box>
             </Box>
             {/* Registration Number */}
-            <TextField
+            {/* <TextField
               fullWidth
               label="Registration Number"
               name="registration_number"
               value={formData.registration_number}
               onChange={handleInputChange}
               sx={{ mb: 2 }}
-            />
+            /> */}
             <Box sx={{
               display: 'flex',
               flexDirection: 'column',

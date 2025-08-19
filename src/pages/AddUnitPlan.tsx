@@ -158,6 +158,24 @@ const InteractiveImageUploader = () => {
     }
   };
 
+  const handleShapeClick = (id: number) => {
+    const name = prompt("Enter unit number:");
+    if (name) {
+      // Validate that the input is a number
+      const unitNumber = parseInt(name);
+      if (isNaN(unitNumber)) {
+        alert("Please enter a valid number");
+        return;
+      }
+      
+      setShapes((prevShapes) =>
+        prevShapes.map((shape) =>
+          shape.id === id ? { ...shape, name: unitNumber.toString() } : shape
+        )
+      );
+    }
+  };
+
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!drawing.points || !svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
@@ -185,50 +203,6 @@ const InteractiveImageUploader = () => {
     }
   };
 
-  const renderShape = (shape: Shape) => {
-    if (shape.type === 'polygon') {
-      const pathData = `M ${shape.points.map(p => `${p.x} ${p.y}`).join(' L ')} Z`;
-      return (
-        <path
-          key={shape.id}
-          d={pathData}
-          fill="rgba(0, 0, 255, 0.2)"
-          stroke="blue"
-          strokeWidth="2"
-        />
-      );
-    } else if (shape.type === 'line') {
-      const [start, end] = shape.points;
-      return (
-        <line
-          key={shape.id}
-          x1={start.x}
-          y1={start.y}
-          x2={end.x}
-          y2={end.y}
-          stroke="blue"
-          strokeWidth="2"
-        />
-      );
-    } else {
-      const [start] = shape.points;
-      const width = shape.points[1].x - start.x;
-      const height = shape.points[1].y - start.y;
-      return (
-        <rect
-          key={shape.id}
-          x={start.x}
-          y={start.y}
-          width={width}
-          height={height}
-          fill="rgba(0, 0, 255, 0.2)"
-          stroke="blue"
-          strokeWidth="2"
-        />
-      );
-    }
-  };
-
   // 3D Image Modal
   const handle3DImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {    
     const file = e.target.files?.[0];
@@ -249,8 +223,17 @@ const InteractiveImageUploader = () => {
     // Attach 3D image to the shape (for demo, just add to shapes array)
     if (pendingPolygon.length > 0) {
       const id = Date.now();
-      setShapes(prev => [...prev, { id, type: 'polygon', points: pendingPolygon, isClosed: true, name: uploaded3DImage?.name }]);
+      setShapes(prev => [...prev, { id, type: 'polygon', points: pendingPolygon, isClosed: true, name: balconyImageName }]);
     }
+
+    // const newShape: Shape = {
+    //         id: Date.now(),
+    //         type: 'polygon',
+    //         points: pendingPolygon,
+    //         isClosed: true,
+    //         name: balconyImageName
+    //       };
+    // setShapes(prev => [...prev, newShape]);
     // Add balcony entry to array
     setBalconyEntries(prev => [...prev, {
       name: balconyImageName,
@@ -330,7 +313,8 @@ const InteractiveImageUploader = () => {
           point = shape.points[0];
         }
         const distances = getDistancesFromSides(point, svgWidth, svgHeight);
-
+        console.log(svgElement);
+        
         // Find the SVG element by id (name)
         const el = svgElement.querySelector(`#${CSS.escape(shape.name || '')}`);
         if (el) {
@@ -362,7 +346,7 @@ const InteractiveImageUploader = () => {
       const response = await axiosInstance.post('/api/units/unitplan', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-        },
+        }, 
       });
 
       setSuccess('Unit Plan saved successfully');
@@ -377,6 +361,53 @@ const InteractiveImageUploader = () => {
     }
   };
 
+    const renderShape = (shape: Shape) => {
+    if (shape.type === 'polygon') {
+      const pathData = `M ${shape.points.map(p => `${p.x} ${p.y}`).join(' L ')} Z`;
+      return (
+        <path
+          key={shape.id}
+          id={shape.name}
+          d={pathData}
+          fill="rgba(0, 0, 255, 0.2)"
+          stroke="blue"
+          strokeWidth="2"
+          onClick={() => handleShapeClick(shape.id)}
+        />
+      );
+    } else if (shape.type === 'line') {
+      const [start, end] = shape.points;
+      return (
+        <line
+          key={shape.id}
+          x1={start.x}
+          y1={start.y}
+          x2={end.x}
+          y2={end.y}
+          stroke="blue"
+          strokeWidth="2"
+          onClick={() => handleShapeClick(shape.id)}
+        />
+      );
+    } else {
+      const [start] = shape.points;
+      const width = shape.points[1].x - start.x;
+      const height = shape.points[1].y - start.y;
+      return (
+        <rect
+          key={shape.id}
+          x={start.x}
+          y={start.y}
+          width={width}
+          height={height}
+          fill="rgba(0, 0, 255, 0.2)"
+          stroke="blue"
+          strokeWidth="2"
+          onClick={() => handleShapeClick(shape.id)}
+        />
+      );
+    }
+  };
 
   return (
     <Box sx={{ p: 3 }}>

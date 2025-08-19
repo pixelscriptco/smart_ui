@@ -351,7 +351,7 @@ const InteractiveImageUploader = () => {
     }
   };
 
-  const renderShape = (shape: Shape) => {
+  const renderShape = (shape: Shape) => {    
     if (shape.type === 'polygon') {
       const pathData = `M ${shape.points.map(p => `${p.x} ${p.y}`).join(' L ')} Z`;
       return (
@@ -367,7 +367,7 @@ const InteractiveImageUploader = () => {
           onMouseOut={handleMouseOut}
         />
       );
-    } else if (shape.type === 'line') {
+    } else if (shape.type === 'line') {      
       const [start, end] = shape.points;
       return (
         <line

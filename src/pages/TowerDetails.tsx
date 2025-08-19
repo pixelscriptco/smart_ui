@@ -69,6 +69,9 @@ const InteractiveImageUploader = () => {
       reader.onload = () => {
         setImageSrc(reader.result as string);
         setIsExistingTower(false); // Reset to false for new uploads
+        setShapes([]);
+        setSvgContent('');
+        svgRef.current?.querySelectorAll('path, line, rect').forEach(el => el.remove());
       };
       reader.readAsDataURL(file);
     }

@@ -35,7 +35,7 @@ const InteractiveImageUploader = () => {
   const [isExistingBuilding, setIsExistingBuilding] = useState(false);
   const [svgContent, setSvgContent] = useState<string | null>(null);
   const [existingShapes, setExistingShapes] = useState<Shape[]>([]);
-  const svgRef = useRef<SVGSVGElement>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const navigate = useNavigate();
   const { project_id } = useParams();
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
@@ -53,6 +53,9 @@ const InteractiveImageUploader = () => {
             setImageSrc(reader.result as string);
             setIsExistingBuilding(false); // Reset to false for new uploads
             setError(null);
+            setShapes([]);
+            setSvgContent('');
+            svgRef.current?.querySelectorAll('path, line, rect').forEach(el => el.remove());
           } else {
             setError('Image must be exactly 4000 x 2250 pixels.');
             setImageSrc(null);

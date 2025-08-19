@@ -33,7 +33,8 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Business as BusinessIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  Http as HttpIcon
 } from '@mui/icons-material';
 import axiosInstance from '../utils/axios';
 import LockResetIcon from '@mui/icons-material/LockReset';
@@ -45,6 +46,7 @@ interface Client {
   mobile: string;
   status: 'active' | 'inactive';
   // type: 'individual' | 'corporate';
+  url: string;
   company: string;
   createdAt: string;
   avatar?: string;
@@ -74,6 +76,9 @@ const Clients = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [urltModalOpen, setClientUrlModal] = useState(false);
+  const [clientUrl, setClientUrl] = useState<string | null>(null);
+  const [clientUrlError, setClientUrlError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<number>(0);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -188,7 +193,17 @@ const Clients = () => {
     }
   };
 
-  const handleResetClick = (clientId: number) => {
+  const handleSetUrl = (clientId: number) => {
+    const client = clients.find(c => c.id === clientId);    
+    if (client) {
+      setSelectedClientId(clientId);
+      setClientUrl(client.url);
+      setClientUrlError('');
+      setClientUrlModal(true);
+    }
+  };
+
+  const handleResetClick = (clientId: number) => {    
     setSelectedClientId(clientId);
     setIsSuccess(false);
     setPassword('');
@@ -210,6 +225,46 @@ const Clients = () => {
           setResetModalOpen(false);
           console.error('Failed to reset password:', err);
           // alert('Failed to reset password');
+        });
+    }
+  };
+
+  const handleSubmitUrl = (clientId: number) => {
+    setClientUrlError('');
+    if (clientUrl) {
+      if (!clientUrl.startsWith('https://')) {
+        setClientUrlError('URL must start with https://');
+        console.error('URL must start with https://');
+        return;
+      }
+      if (!clientUrl.endsWith('.proptour.live')) {
+        setClientUrlError('URL must end with .proptour.live');
+        console.error('URL must end with .proptour.live');
+        return;
+      }
+      if (clientUrl.length < 23) {
+        setClientUrlError('URL must be at least 20 characters long');
+        console.error('URL must be at least 20 characters long');
+        return;
+      }
+      if (clientUrl.includes(' ')) {
+        setClientUrlError('URL cannot contain spaces');
+        console.error('URL cannot contain spaces');
+        // alert('URL cannot contain spaces');
+        return;
+      }
+      axiosInstance
+        .patch(`/api/users/clients/${clientId}/set-url`, {
+          url: clientUrl
+        })
+        .then(() => {
+          setIsSuccess(true);
+          setTimeout(() => setClientUrlModal(false), 2000); 
+        })
+        .catch((err) => {
+          setClientUrlModal(false);
+          console.error('Failed to reset client url:', err);
+          // alert('Failed to reset client url');
         });
     }
   };
@@ -538,6 +593,44 @@ const Clients = () => {
         </DialogActions>
       </Dialog>
 
+      <Dialog open={urltModalOpen} onClose={() => setClientUrlModal(false)}  maxWidth="sm" fullWidth>
+        <DialogTitle>Set URL for Client</DialogTitle>
+         {(
+          <Typography sx={{ ml: 3, mb: 0 }} color="textSecondary" variant="caption">
+            <strong>Note:</strong> Ensure the URL starts with <code>https://</code> and ends with <code>.proptour.live</code>.
+          </Typography>
+        )}
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            placeholder='https://example.proptour.live'
+            label="URL"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={clientUrl || ''}
+            onChange={(e) => setClientUrl(e.target.value)}
+          />
+        </DialogContent>
+
+        {clientUrlError && (
+          <Typography color="error" sx={{ ml: 2, mb: 1 }} variant="caption">{clientUrlError}</Typography>
+        )}
+        {/* {clientUrl && (
+          <Typography sx={{ ml: 2, mb: 1 }}>
+            <strong>Preview:</strong> {clientUrl}
+          </Typography>
+        )} */}
+        {isSuccess && (
+          <Typography color="success.main" sx={{ ml: 2, mb: 1 }}>URL updated successfully!</Typography>
+        )}
+        <DialogActions>
+          <Button onClick={() => setClientUrlModal(false)}>Cancel</Button>
+          <Button onClick={() => handleSubmitUrl(selectedClientId)} variant="contained" color="primary">{isSuccess ? <CheckIcon /> : 'Submit'}</Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 4 }}>
         <Box sx={{ 
@@ -676,11 +769,11 @@ const Clients = () => {
                       <TableCell>{new Date(client.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell align="right">
                         <IconButton 
-                          size="small" 
-                          onClick={() => handleEdit(client.id)}
-                          color="primary"
-                        >
-                          <EditIcon />
+                            size="small" 
+                            onClick={() => handleSetUrl(client.id)}
+                            color="secondary"
+                          >
+                            <HttpIcon />
                         </IconButton>
                         <IconButton 
                             size="small" 
@@ -688,6 +781,13 @@ const Clients = () => {
                             color="secondary"
                           >
                             <LockResetIcon />
+                        </IconButton>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleEdit(client.id)}
+                          color="primary"
+                        >
+                          <EditIcon />
                         </IconButton>
                       </TableCell>
                     </TableRow>

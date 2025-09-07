@@ -20,16 +20,16 @@ type ConnectingLine = {
 };
 
 type Shape = {
-  id: number;
-  type: 'line' | 'rectangle' | 'polygon' | 'freeform' | 'simple-line';
-  points: Point[];
-  name?: string;
-  isClosed?: boolean;
-  floorCount?: number;
-  internalPoints?: Point[];
-  borderPoints?: Point[];
-  connectingLines?: ConnectingLine[];
-  parts?: { id: string; points: Point[] }[]; // id is string
+id: number;
+type: 'line' | 'rectangle' | 'polygon' | 'freeform' | 'simple-line' | 'vertical-line'; // added vertical-line
+points: Point[];
+name?: string;
+isClosed?: boolean;
+floorCount?: number;
+internalPoints?: Point[];
+borderPoints?: Point[];
+connectingLines?: ConnectingLine[];
+parts?: { id: string; points: Point[] }[];
 };
 
 const InteractiveImageUploader = () => {
@@ -42,7 +42,7 @@ const InteractiveImageUploader = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [drawMode, setDrawMode] = useState<'line' | 'rectangle' | 'freeform' | 'simple-line'>('line');
+  const [drawMode, setDrawMode] = useState<'line' | 'rectangle' | 'freeform' | 'vertical-line'| 'simple-line'>('line');
   const [currentPolygon, setCurrentPolygon] = useState<Point[]>([]);
   const [currentFreeform, setCurrentFreeform] = useState<Point[]>([]);
   const [towerName, setTowerName] = useState('');
@@ -96,7 +96,9 @@ const InteractiveImageUploader = () => {
     } else if (drawMode === 'rectangle' && !drawing.points) {
       // Start rectangle drawing
       setDrawing({ type: drawMode, points: [{ x, y }] });
-    }
+    }else if (drawMode === 'vertical-line' && !drawing.points) {
+      setDrawing({ type: 'vertical-line', points: [{ x, y }] });
+      }
   };
 
   const fetchTower = async (orderParam = orderNumber) => {
@@ -234,7 +236,11 @@ const InteractiveImageUploader = () => {
       // Create path for the current freeform shape being drawn
       const path = `M ${currentFreeform.map(p => `${p.x} ${p.y}`).join(' L ')} L ${currentX} ${currentY}`;
       setCurrentPath(path);
-    } else if (drawing.points) {
+    }else if (drawing.type === 'vertical-line' && drawing.points && drawing.points.length > 0) {
+      const startPoint = drawing.points[0];
+      let path = `M ${startPoint.x} ${startPoint.y} L ${startPoint.x} ${currentY}`;
+      setCurrentPath(path);
+    }else if (drawing.points) {
       const startPoint = drawing.points[0];
       let path = '';
 
@@ -301,6 +307,7 @@ const InteractiveImageUploader = () => {
 
   const handleShapeBorderClick = (e: React.MouseEvent, shapeId: number) => {
     e.stopPropagation(); // Prevent event bubbling
+    
     if (!svgRef.current) return;
     
     const rect = svgRef.current.getBoundingClientRect();
@@ -310,6 +317,8 @@ const InteractiveImageUploader = () => {
     let newLineId: number | null = null;
     const newShapes = setShapes(prevShapes => {
       const mapped = prevShapes.map(shape => {
+        console.log(shape);
+        
         if (shape.id === shapeId) {
           const existingBorderPoints = shape.borderPoints || [];
           const newBorderPoints = [...existingBorderPoints, { x, y }];

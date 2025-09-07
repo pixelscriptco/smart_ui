@@ -75,6 +75,9 @@ interface ProjectFormData {
   registration_number?: string;
   qr_code?: File | null;
   location?: string;
+  location_title?: string;
+  location_description?: string;
+  location_image?: File | null;
 }
 
 const Projects: React.FC = () => {
@@ -92,10 +95,14 @@ const Projects: React.FC = () => {
     company_id: 0,
     registration_number: '',
     qr_code: null,
-    location: ''
+    location: '',
+    location_title: '',
+    location_description: '',
+    location_image: null
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [qrCodePreview, setQrCodePreview] = useState<string | null>(null);
+  const [locationImagePreview, setLocationImagePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -163,10 +170,14 @@ const Projects: React.FC = () => {
         company_id: project.user_id,
         registration_number: (project as any).registration_number || '',
         qr_code: null,
-        location: (project as any).location || ''
+        location: (project as any).location || '',
+        location_title: (project as any).location_title || '',
+        location_description: (project as any).location_description || '',
+        location_image: null
       });
       setLogoPreview(project.logo || null);
       setQrCodePreview((project as any).qr_code || null);
+      setLocationImagePreview((project as any).location_image || null);
     } else {
       setIsEditing(false);
       setCurrentProjectId(null);
@@ -179,10 +190,14 @@ const Projects: React.FC = () => {
         company_id: 0,
         registration_number: '',
         qr_code: null,
-        location: ''
+        location: '',
+        location_title: '',
+        location_description: '',
+        location_image: null
       });
       setLogoPreview(null);
       setQrCodePreview(null);
+      setLocationImagePreview(null);
     }
     setOpen(true);
   };
@@ -199,10 +214,14 @@ const Projects: React.FC = () => {
       company_id: 0,
       registration_number: '',
       qr_code: null,
-      location: ''
+      location: '',
+      location_title: '',
+      location_description: '',
+      location_image: null
     });
     setLogoPreview(null);
     setQrCodePreview(null);
+    setLocationImagePreview(null);
     setIsEditing(false);
     setCurrentProjectId(null);
   };
@@ -248,6 +267,21 @@ const Projects: React.FC = () => {
     }
   };
 
+  const handleLocationImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFormData(prev => ({
+        ...prev,
+        location_image: file
+      }));
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLocationImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
@@ -276,6 +310,15 @@ const Projects: React.FC = () => {
     }
     if (formData.location) {
       formDataToSend.append('location', formData.location);
+    }
+    if (formData.location_title) {
+      formDataToSend.append('location_title', formData.location_title);
+    }
+    if (formData.location_description) {
+      formDataToSend.append('location_description', formData.location_description);
+    }
+    if (formData.location_image) {
+      formDataToSend.append('location_image', formData.location_image);
     }
 
     try {
@@ -717,6 +760,42 @@ const Projects: React.FC = () => {
                 onChange={handleInputChange}
               />
               <LexicalEditor onChange={(html) => setFormData(prev => ({ ...prev, description: html }))} />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box component="label" htmlFor="location-image-upload" sx={{ cursor: 'pointer' }}>
+                  <Avatar
+                    src={locationImagePreview || undefined}
+                    sx={{ width: 64, height: 64 }}
+                  >
+                    {!locationImagePreview && <UploadIcon />}
+                  </Avatar>
+                  <input
+                    id="location-image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLocationImageChange}
+                    style={{ display: 'none' }}
+                  />
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    Image
+                  </Typography>
+                </Box>
+                <TextField
+                  fullWidth
+                  label="Location Title"
+                  name="location_title"
+                  value={formData.location_title}
+                  onChange={handleInputChange}
+                />
+              </Box>
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                label="Location Description"
+                name="location_description"
+                value={formData.location_description}
+                onChange={handleInputChange}
+              />
               <MapPicker
                 coordinates={coordinates}
                 setCoordinates={setCoordinates}

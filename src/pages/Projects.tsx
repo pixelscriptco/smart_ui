@@ -754,8 +754,8 @@ const Projects: React.FC = () => {
               />
               <TextField
                 fullWidth
-                label="Project URL"
-                name="project_url"
+                label="VR URL"
+                name="vr_url"
                 value={formData.project_url}
                 onChange={handleInputChange}
               />

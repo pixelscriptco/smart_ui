@@ -315,7 +315,9 @@ const InteractiveImageUploader = () => {
 
   const handleShapeBorderClick = (e: React.MouseEvent, shapeId: number) => {
     e.stopPropagation(); // Prevent event bubbling
+    
     if (!svgRef.current) return;
+    
     const rect = svgRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -323,8 +325,102 @@ const InteractiveImageUploader = () => {
     // In dot mode, clicking the outline adds a dot at the clicked point
     if (dotMode) {
       setDotPoints(prev => [...prev, { x, y }]);
+      return;
     }
-    return;
+
+    let newLineId: number | null = null;
+    const newShapes = setShapes(prevShapes => {
+      const mapped = prevShapes.map(shape => {
+        console.log(shape);
+        
+        if (shape.id === shapeId) {
+          const existingBorderPoints = shape.borderPoints || [];
+          const newBorderPoints = [...existingBorderPoints, { x, y }];
+          
+          // Create connecting lines in pairs: 1-2, 3-4, 5-6, etc.
+          let connectingLines = shape.connectingLines || [];
+          if (newBorderPoints.length >= 2 && newBorderPoints.length % 2 === 0) {
+            // Only create a line when we have an even number of points (pairs)
+            const lineId = Date.now() + Math.random();
+            newLineId = lineId;
+            
+            connectingLines.push({
+              id: lineId,
+              startPoint: newBorderPoints[newBorderPoints.length - 2], // Second to last point
+              endPoint: newBorderPoints[newBorderPoints.length - 1],  // Last point
+              color: getShapeColor(shape.type) // Get the same color as the original shape
+            });
+          }
+          
+          // Create sections/parts based on pairs of points
+          if (shape.type === 'polygon' && newBorderPoints.length >= 2 && newBorderPoints.length % 2 === 0) {
+            const pairIndex = Math.floor(newBorderPoints.length / 2) - 1; // Which pair (0, 1, 2, etc.)
+            const p1 = newBorderPoints[pairIndex * 2];
+            const p2 = newBorderPoints[pairIndex * 2 + 1];
+            
+            // Find the bounding box of the shape
+            const minX = Math.min(...shape.points.map(p => p.x));
+            const maxX = Math.max(...shape.points.map(p => p.x));
+            const minY = Math.min(...shape.points.map(p => p.y));
+            const maxY = Math.max(...shape.points.map(p => p.y));
+            
+            let partPoints: Point[] = [];
+            
+            if (pairIndex === 0) {
+              // First pair (1-2): Create section from line 1-2 to bottom of shape
+              partPoints = [
+                p1, p2,
+                { x: maxX, y: p2.y }, // Right side
+                { x: maxX, y: maxY }, // Bottom right
+                { x: minX, y: maxY }, // Bottom left
+                { x: minX, y: p1.y }, // Left side
+                p1 // Close the polygon
+              ];
+            } else {
+              // Subsequent pairs: Create section between current line and previous line
+              const prevP1 = newBorderPoints[(pairIndex - 1) * 2];
+              const prevP2 = newBorderPoints[(pairIndex - 1) * 2 + 1];
+              
+              partPoints = [
+                p1, p2, // Current line
+                { x: maxX, y: p2.y }, // Right side to current line
+                { x: maxX, y: prevP2.y }, // Right side to previous line
+                prevP2, prevP1, // Previous line
+                { x: minX, y: prevP1.y }, // Left side to previous line
+                { x: minX, y: p1.y }, // Left side to current line
+                p1 // Close the polygon
+              ];
+            }
+            
+            const partId = Date.now() + Math.random();
+            const newParts = (shape.parts || []).concat([{ id: String(partId), points: partPoints }]);
+            
+            return {
+              ...shape,
+              borderPoints: newBorderPoints,
+              connectingLines: connectingLines,
+              parts: newParts
+            };
+          }
+
+          return {
+            ...shape,
+            borderPoints: newBorderPoints,
+            connectingLines: connectingLines
+          };
+        }
+        return shape;
+      });
+      // After state update, trigger modal if a new line was created
+      if (newLineId) {
+        setTimeout(() => {
+          setPendingFloorShapeId(shapeId);
+          setPendingLineId(newLineId!);
+          setFloorModalOpen(true);
+        }, 0);
+      }
+      return mapped;
+    });
   };
 
   // Helper function to get the color for each shape type
@@ -335,9 +431,9 @@ const InteractiveImageUploader = () => {
       case 'line':
         return 'green';
       case 'simple-line':
-        return 'green';
+        return 'blue';
       case 'freeform':
-        return 'green';
+        return 'purple';
       case 'rectangle':
         return 'green';
       default:
@@ -407,13 +503,15 @@ const InteractiveImageUploader = () => {
         }
         const distances = getDistancesFromSides(point, svgWidth, svgHeight);
 
-        // Find the SVG element by id (name)
-        const el = svgElement.querySelector(`#${CSS.escape(shape.name || '')}`);
-        if (el) {
-          const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
-          desc.setAttribute('data-distance', 'true');
-          desc.textContent = `left:${distances.left},right:${distances.right},top:${distances.top},bottom:${distances.bottom}`;
-          el.appendChild(desc);
+        // Find the SVG element by id (name) - only if shape has a valid name
+        if (shape.name && shape.name.trim()) {
+          const el = svgElement.querySelector(`#${CSS.escape(shape.name)}`);
+          if (el) {
+            const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
+            desc.setAttribute('data-distance', 'true');
+            desc.textContent = `left:${distances.left},right:${distances.right},top:${distances.top},bottom:${distances.bottom}`;
+            el.appendChild(desc);
+          }
         }
       });
 

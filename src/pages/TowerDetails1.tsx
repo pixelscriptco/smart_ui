@@ -658,7 +658,7 @@ const InteractiveImageUploader = () => {
           const pathData = `M ${part.points.map(p => `${p.x} ${p.y}`).join(' L ')} Z`;
           elements.push(
             <path
-              key={`part-${shape.id}-${part.id}`}
+              key={`${part.id}`}
               id={part.id}
               d={pathData}
               fill="rgba(0, 255, 0, 0.3)"

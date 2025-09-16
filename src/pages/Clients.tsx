@@ -259,6 +259,15 @@ const Clients = () => {
         })
         .then(() => {
           setIsSuccess(true);
+          // Update the client's URL in the local state
+          setClients(prevClients =>
+            prevClients.map(client =>
+              client.id === clientId
+                ? { ...client, url: clientUrl }
+                : client
+            )
+          );
+          
           setTimeout(() => setClientUrlModal(false), 2000); 
         })
         .catch((err) => {

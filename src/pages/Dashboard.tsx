@@ -19,6 +19,7 @@ import {
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../utils/axios';
 
 interface Stats {
@@ -39,13 +40,15 @@ const StatCard: React.FC<{
   color: string;
   loading?: boolean;
   rightColumn?: React.ReactNode;
-}> = ({ title, value, icon, color, loading, rightColumn }) => {
+  onClick?: () => void;
+}> = ({ title, value, icon, color, loading, rightColumn, onClick }) => {
   const theme = useTheme();
   
   return (
     <Fade in timeout={500}>
       <Paper
         elevation={0}
+        onClick={onClick}
         sx={{
           p: 3,
           height: '100%',
@@ -56,6 +59,7 @@ const StatCard: React.FC<{
           borderRadius: 2,
           border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           transition: 'transform 0.2s, box-shadow 0.2s',
+          cursor: onClick ? 'pointer' : 'default',
           '&:hover': {
             transform: 'translateY(-4px)',
             boxShadow: theme.shadows[4],
@@ -125,6 +129,7 @@ const StatCard: React.FC<{
 const Dashboard: React.FC = () => {
   const theme = useTheme();
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [customers, setCustomerStats] = useState<Stats>({
     total: 0,
     active: 0
@@ -231,6 +236,7 @@ const Dashboard: React.FC = () => {
               icon={<PeopleIcon />}
               color={theme.palette.primary.main}
               loading={refreshing}
+              onClick={() => navigate('/clients')}
             />
             <StatCard
               title="Active Customers"
@@ -238,6 +244,7 @@ const Dashboard: React.FC = () => {
               icon={<TrendingUpIcon />}
               color={theme.palette.success.main}
               loading={refreshing}
+              onClick={() => navigate('/clients')}
             />
             <StatCard
               title="Total Projects"
@@ -245,6 +252,7 @@ const Dashboard: React.FC = () => {
               icon={<BusinessIcon />}
               color={theme.palette.info.main}
               loading={refreshing}
+              onClick={() => navigate('/projects')}
             />
             <StatCard
               title="Total Enquiries"
@@ -265,6 +273,7 @@ const Dashboard: React.FC = () => {
                   </Typography>
                 </>
               }
+              onClick={() => navigate('/enquiries')}
             />
           </Box>
         </Box>

@@ -309,9 +309,9 @@ const InteractiveImageUploader = () => {
       });
 
       setSuccess('Floor Plan saved successfully');
-      setFloorPlanName('');
-      setShapes([]);
-      setImageSrc(null);
+      // setFloorPlanName('');
+      // setShapes([]);
+      // setImageSrc(null);
     } catch (err: any) {
       console.error('Save error:', err);
       setError(err.response?.data?.message || 'Error saving Floor Plan');

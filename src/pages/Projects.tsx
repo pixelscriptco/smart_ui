@@ -231,6 +231,7 @@ const Projects: React.FC = () => {
     { target: { name: string; value: number | string } }
   ) => {
     const { name, value } = e.target;
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -755,11 +756,14 @@ const Projects: React.FC = () => {
               <TextField
                 fullWidth
                 label="VR URL"
-                name="vr_url"
+                name="project_url"
                 value={formData.project_url}
                 onChange={handleInputChange}
               />
-              <LexicalEditor onChange={(html) => setFormData(prev => ({ ...prev, description: html }))} />
+              <LexicalEditor 
+                initialValue={formData.description} 
+                onChange={(html) => setFormData(prev => ({ ...prev, description: html }))} 
+              />
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box component="label" htmlFor="location-image-upload" sx={{ cursor: 'pointer' }}>
                   <Avatar

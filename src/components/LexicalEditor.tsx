@@ -8,7 +8,7 @@ import { ContentEditable } from '@lexical/react/LexicalContentEditable';
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
 import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
 import { $generateHtmlFromNodes } from '@lexical/html';
-import { $getRoot,TextNode } from 'lexical';
+import { $getRoot, TextNode, $createParagraphNode, $createTextNode } from 'lexical';
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
 import ToolbarPlugin from './ToolbarPlugin';
 import { HeadingNode, QuoteNode } from '@lexical/rich-text';
@@ -32,11 +32,21 @@ const theme = {
 };
 
 const LexicalEditor: React.FC<LexicalEditorProps> = ({ onChange, initialValue }) => {
+  const [isInitialized, setIsInitialized] = useState(false);
+
   const handleChange = (editorState: any, editor: any) => {
     editor.update(() => {
       const htmlString = $generateHtmlFromNodes(editor, null);
       onChange(htmlString);
     });
+  };
+
+  // Extract text content from HTML
+  const getTextFromHtml = (html: string): string => {
+    if (!html) return '';
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
   };
 
   const editorConfig: InitialConfigType = {
@@ -45,8 +55,40 @@ const LexicalEditor: React.FC<LexicalEditorProps> = ({ onChange, initialValue })
     onError(error: Error) {
       throw error;
     },
-    nodes: [HeadingNode,TextNode, QuoteNode],
+    nodes: [HeadingNode, TextNode, QuoteNode],
+    editorState: initialValue ? JSON.stringify({
+      root: {
+        children: [{
+          children: [{
+            detail: 0,
+            format: 0,
+            mode: "normal",
+            style: "",
+            text: getTextFromHtml(initialValue),
+            type: "text",
+            version: 1
+          }],
+          direction: "ltr",
+          format: "",
+          indent: 0,
+          type: "paragraph",
+          version: 1
+        }],
+        direction: "ltr",
+        format: "",
+        indent: 0,
+        type: "root",
+        version: 1
+      }
+    }) : undefined,
   };
+
+  useEffect(() => {
+    if (initialValue && !isInitialized) {
+      // This will be handled by the editor's initial state
+      setIsInitialized(true);
+    }
+  }, [initialValue, isInitialized]);
 
   return (
     <LexicalComposer initialConfig={editorConfig}>

@@ -190,11 +190,15 @@ const Enquiries: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={enquiry.type ? enquiry.type.charAt(0).toUpperCase() + enquiry.type.slice(1) : 'Warm'}
-                          color={enquiry.type && typeColors[enquiry.type] ? typeColors[enquiry.type] : 'info'}
-                          size="small"
-                        />
+                        {enquiry.type != null ? (
+                          <Chip
+                            label={enquiry.type ? enquiry.type.charAt(0).toUpperCase() + enquiry.type.slice(1) : '-'}
+                            color={enquiry.type && typeColors[enquiry.type] ? typeColors[enquiry.type] : 'info'}
+                            size="small"
+                          />
+                        ):(
+                          <p>-</p>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

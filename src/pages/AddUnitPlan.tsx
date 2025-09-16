@@ -351,8 +351,8 @@ const InteractiveImageUploader = () => {
 
       setSuccess('Unit Plan saved successfully');
       // Reset form after successful save
-      setUnitPlanName('');
-      setImageSrc(null);
+      // setUnitPlanName('');
+      // setImageSrc(null);
     } catch (err: any) {
       console.error('Save error:', err);
       setError(err.response?.data?.message || 'Error saving Unit Plan');

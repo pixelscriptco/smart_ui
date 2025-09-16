@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Box, Button, Typography, Paper, CircularProgress, Alert, ToggleButton, ToggleButtonGroup, IconButton, Tooltip, InputLabel,Select, MenuItem, Modal } from '@mui/material';
-import { CloudUpload as CloudUploadIcon, Save as SaveIcon, Straighten as LineIcon, Rectangle as RectangleIcon, Undo as UndoIcon, ArrowBack as ArrowBackIcon, Create as CreateIcon, ShowChart as ShowChartIcon, Layers as LayersIcon } from '@mui/icons-material';
+import { Box, Button, Typography, Paper, CircularProgress, Alert, ToggleButton, ToggleButtonGroup, IconButton, Tooltip, InputLabel, Select, MenuItem, Modal, FormControl } from '@mui/material';
+import { CloudUpload as CloudUploadIcon, Save as SaveIcon, Straighten as LineIcon, Rectangle as RectangleIcon, Undo as UndoIcon, ArrowBack as ArrowBackIcon, Create as CreateIcon, ShowChart as ShowChartIcon, Layers as LayersIcon, CropFree as CropFreeIcon } from '@mui/icons-material';
 import axiosInstance from '../utils/axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SelectChangeEvent } from '@mui/material/Select';
@@ -29,7 +29,9 @@ floorCount?: number;
 internalPoints?: Point[];
 borderPoints?: Point[];
 connectingLines?: ConnectingLine[];
-parts?: { id: string; points: Point[] }[];
+parts?: { id: string; points: Point[]; mappedUnitId?: string }[];
+splits?: { id: string; points: Point[]; mappedUnitId?: string }[];
+mappedUnitId?: string;
 };
 
 const InteractiveImageUploader = () => {
@@ -63,6 +65,14 @@ const InteractiveImageUploader = () => {
   const newLineIdRef = useRef<number | null>(null);
   const [dotMode, setDotMode] = useState(false);
   const [dotPoints, setDotPoints] = useState<Point[]>([]);
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitLines, setSplitLines] = useState<{ id: string; start: Point; end: Point }[]>([]);
+  const [unitMappingModalOpen, setUnitMappingModalOpen] = useState(false);
+  const [selectedShapeId, setSelectedShapeId] = useState<number | null>(null);
+  const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
+  const [selectedSplitId, setSelectedSplitId] = useState<string | null>(null);
+  const [availableUnits, setAvailableUnits] = useState<any[]>([]);
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -157,9 +167,48 @@ const InteractiveImageUploader = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Check if clicking on a closed shape first
+    const target = e.target as SVGElement;
+    if (target.tagName === 'path' && target.getAttribute('d')) {
+      // Find the shape by checking if this path belongs to a closed shape
+      const pathId = target.id;
+      const shape = shapes.find(s => s.id.toString() === pathId || s.name === pathId);
+      if (shape && shape.isClosed) {
+        e.stopPropagation();
+        handleShapeClick(shape.id);
+        return;
+      }
+    }
+
     // Dot placing mode: collect points only, no shapes
     if (dotMode) {
       setDotPoints(prev => [...prev, { x, y }]);
+      return;
+    }
+
+    // Split mode: draw lines to split floors
+    if (splitMode) {
+      const lastLine = splitLines[splitLines.length - 1];
+      
+      if (!lastLine || (lastLine.start && lastLine.end)) {
+        // Start new split line - only set start point, end will be set on next click
+        setSplitLines(prev => [...prev, { id: `split-${Date.now()}`, start: { x, y }, end: { x, y } }]);
+      } else if (lastLine && lastLine.start && lastLine.start.x === lastLine.end.x && lastLine.start.y === lastLine.end.y) {
+        // Complete the current split line
+        setSplitLines(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            end: { x, y }
+          };
+          return updated;
+        });
+        
+        // Create splits for all shapes that intersect with this line
+        setTimeout(() => {
+          createSplitsFromLine({ x, y });
+        }, 100);
+      }
       return;
     }
 
@@ -236,6 +285,21 @@ const InteractiveImageUploader = () => {
     const currentX = e.clientX - rect.left;
     const currentY = e.clientY - rect.top;
     
+    // Handle split mode line drawing
+    if (splitMode && splitLines.length > 0) {
+      const currentLine = splitLines[splitLines.length - 1];
+      if (currentLine && currentLine.start && currentLine.start.x === currentLine.end.x && currentLine.start.y === currentLine.end.y) {
+        setSplitLines(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            end: { x: currentX, y: currentY }
+          };
+          return updated;
+        });
+      }
+    }
+    
     if (drawMode === 'line' && currentPolygon.length > 0) {
       // Create path for the current polygon being drawn
       const path = `M ${currentPolygon.map(p => `${p.x} ${p.y}`).join(' L ')} L ${currentX} ${currentY}`;
@@ -309,8 +373,219 @@ const InteractiveImageUploader = () => {
     setCurrentPath('');
   };
 
+  const fetchAvailableUnits = async () => {
+    try {
+      const response = await axiosInstance.get(`/api/towers/${tower_id}/units`);
+      setAvailableUnits(response.data.units || []);
+    } catch (error) {
+      console.error('Error fetching units:', error);
+      setAvailableUnits([]);
+    }
+  };
+
   const handleShapeClick = (id: number) => {
-    // Removed popup functionality - shapes can be named through other means if needed
+    // Check if the shape is closed and can be mapped to a unit
+    const shape = shapes.find(s => s.id === id);
+    if (shape && shape.isClosed) {
+      setSelectedShapeId(id);
+      setSelectedPartId(null);
+      setSelectedUnitId('');
+      fetchAvailableUnits();
+      setUnitMappingModalOpen(true);
+    }
+  };
+
+  const handlePartClick = (shapeId: number, partId: string, partIndex: number) => {
+    setSelectedShapeId(shapeId);
+    setSelectedPartId(partId);
+    setSelectedSplitId(null);
+    setSelectedUnitId('');
+    fetchAvailableUnits();
+    setUnitMappingModalOpen(true);
+  };
+
+  const handleSplitClick = (shapeId: number, splitId: string, splitIndex: number) => {
+    setSelectedShapeId(shapeId);
+    setSelectedSplitId(splitId);
+    setSelectedPartId(null);
+    setSelectedUnitId('');
+    fetchAvailableUnits();
+    setUnitMappingModalOpen(true);
+  };
+
+  const createSplitsFromLine = (endPoint: Point) => {
+    if (splitLines.length === 0) return;
+    
+    const currentLine = splitLines[splitLines.length - 1];
+    const startPoint = currentLine.start;
+    
+    console.log('Creating splits from line:', { startPoint, endPoint, shapesCount: shapes.length });
+    
+    // Find all shapes that could be split by this line
+    shapes.forEach(shape => {
+      if (shape.type === 'polygon' && shape.isClosed && shape.points) {
+        console.log('Found polygon shape:', shape.id);
+        // Create a simple split by dividing the polygon area
+        const splits = createSimpleSplits(shape.points, startPoint, endPoint);
+        console.log('Created splits:', splits);
+        
+        if (splits.length > 0) {
+          setShapes(prevShapes =>
+            prevShapes.map(s => 
+              s.id === shape.id 
+                ? { ...s, splits: splits }
+                : s
+            )
+          );
+        }
+      }
+    });
+  };
+
+  const createSimpleSplits = (polygon: Point[], lineStart: Point, lineEnd: Point): { id: string; points: Point[]; mappedUnitId?: string }[] => {
+    const splits: { id: string; points: Point[]; mappedUnitId?: string }[] = [];
+    
+    // Get polygon bounds
+    const minX = Math.min(...polygon.map(p => p.x));
+    const maxX = Math.max(...polygon.map(p => p.x));
+    const minY = Math.min(...polygon.map(p => p.y));
+    const maxY = Math.max(...polygon.map(p => p.y));
+    
+    // Create two splits based on the line direction
+    const isVertical = Math.abs(lineEnd.x - lineStart.x) < Math.abs(lineEnd.y - lineStart.y);
+    
+    if (isVertical) {
+      // Vertical line - split left and right
+      const splitX = (lineStart.x + lineEnd.x) / 2;
+      
+      // Left split
+      splits.push({
+        id: `split-left-${Date.now()}`,
+        points: [
+          { x: minX, y: minY },
+          { x: splitX, y: minY },
+          { x: splitX, y: maxY },
+          { x: minX, y: maxY }
+        ],
+        mappedUnitId: undefined
+      });
+      
+      // Right split
+      splits.push({
+        id: `split-right-${Date.now()}`,
+        points: [
+          { x: splitX, y: minY },
+          { x: maxX, y: minY },
+          { x: maxX, y: maxY },
+          { x: splitX, y: maxY }
+        ],
+        mappedUnitId: undefined
+      });
+    } else {
+      // Horizontal line - split top and bottom
+      const splitY = (lineStart.y + lineEnd.y) / 2;
+      
+      // Top split
+      splits.push({
+        id: `split-top-${Date.now()}`,
+        points: [
+          { x: minX, y: minY },
+          { x: maxX, y: minY },
+          { x: maxX, y: splitY },
+          { x: minX, y: splitY }
+        ],
+        mappedUnitId: undefined
+      });
+      
+      // Bottom split
+      splits.push({
+        id: `split-bottom-${Date.now()}`,
+        points: [
+          { x: minX, y: splitY },
+          { x: maxX, y: splitY },
+          { x: maxX, y: maxY },
+          { x: minX, y: maxY }
+        ],
+        mappedUnitId: undefined
+      });
+    }
+    
+    return splits;
+  };
+
+  const findLinePolygonIntersections = (start: Point, end: Point, polygon: Point[]): Point[] => {
+    const intersections: Point[] = [];
+    
+    for (let i = 0; i < polygon.length; i++) {
+      const p1 = polygon[i];
+      const p2 = polygon[(i + 1) % polygon.length];
+      
+      const intersection = getLineIntersection(start, end, p1, p2);
+      if (intersection) {
+        intersections.push(intersection);
+      }
+    }
+    
+    return intersections;
+  };
+
+  const getLineIntersection = (line1Start: Point, line1End: Point, line2Start: Point, line2End: Point): Point | null => {
+    const x1 = line1Start.x, y1 = line1Start.y;
+    const x2 = line1End.x, y2 = line1End.y;
+    const x3 = line2Start.x, y3 = line2Start.y;
+    const x4 = line2End.x, y4 = line2End.y;
+    
+    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(denom) < 1e-10) return null; // Lines are parallel
+    
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+    
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+      return {
+        x: x1 + t * (x2 - x1),
+        y: y1 + t * (y2 - y1)
+      };
+    }
+    
+    return null;
+  };
+
+  const dividePolygonAlongLine = (polygon: Point[], lineStart: Point, lineEnd: Point, intersections: Point[]): { id: string; points: Point[]; mappedUnitId?: string }[] => {
+    if (intersections.length < 2) return [];
+    
+    // Sort intersections along the line
+    const sortedIntersections = intersections.sort((a, b) => {
+      const distA = Math.sqrt((a.x - lineStart.x) ** 2 + (a.y - lineStart.y) ** 2);
+      const distB = Math.sqrt((b.x - lineStart.x) ** 2 + (b.y - lineStart.y) ** 2);
+      return distA - distB;
+    });
+    
+    const splits: { id: string; points: Point[]; mappedUnitId?: string }[] = [];
+    
+    // Create splits by dividing the polygon into sections
+    // For now, create a simple split that divides the polygon in half
+    const splitId = `split-${Date.now()}`;
+    
+    // Find the center point of the polygon
+    const centerX = polygon.reduce((sum, p) => sum + p.x, 0) / polygon.length;
+    const centerY = polygon.reduce((sum, p) => sum + p.y, 0) / polygon.length;
+    
+    // Create a simple rectangular split using the line
+    const splitPoints = [
+      { x: Math.min(lineStart.x, lineEnd.x), y: Math.min(lineStart.y, lineEnd.y) },
+      { x: Math.max(lineStart.x, lineEnd.x), y: Math.min(lineStart.y, lineEnd.y) },
+      { x: Math.max(lineStart.x, lineEnd.x), y: Math.max(lineStart.y, lineEnd.y) },
+      { x: Math.min(lineStart.x, lineEnd.x), y: Math.max(lineStart.y, lineEnd.y) }
+    ];
+    
+    splits.push({
+      id: splitId,
+      points: splitPoints,
+      mappedUnitId: undefined
+    });
+    
+    return splits;
   };
 
   const handleShapeBorderClick = (e: React.MouseEvent, shapeId: number) => {
@@ -325,7 +600,7 @@ const InteractiveImageUploader = () => {
     // In dot mode, clicking the outline adds a dot at the clicked point
     if (dotMode) {
       setDotPoints(prev => [...prev, { x, y }]);
-      return;
+    return;
     }
 
     let newLineId: number | null = null;
@@ -506,11 +781,11 @@ const InteractiveImageUploader = () => {
         // Find the SVG element by id (name) - only if shape has a valid name
         if (shape.name && shape.name.trim()) {
           const el = svgElement.querySelector(`#${CSS.escape(shape.name)}`);
-          if (el) {
-            const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
-            desc.setAttribute('data-distance', 'true');
-            desc.textContent = `left:${distances.left},right:${distances.right},top:${distances.top},bottom:${distances.bottom}`;
-            el.appendChild(desc);
+        if (el) {
+          const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
+          desc.setAttribute('data-distance', 'true');
+          desc.textContent = `left:${distances.left},right:${distances.right},top:${distances.top},bottom:${distances.bottom}`;
+          el.appendChild(desc);
           }
         }
       });
@@ -540,10 +815,10 @@ const InteractiveImageUploader = () => {
 
       setSuccess('Tower saved successfully');
       // Reset form after successful save
-      setTowerName('');
+      // setTowerName('');
       // setOrderNumber(0);
-      setShapes([]);
-      setImageSrc(null);
+      // setShapes([]);
+      // setImageSrc(null);
     } catch (err: any) {
       console.error('Save error:', err);
       setError(err.response?.data?.message || 'Error saving tower');
@@ -674,12 +949,25 @@ const InteractiveImageUploader = () => {
           const pathData = `M ${part.points.map(p => `${p.x} ${p.y}`).join(' L ')} Z`;
           elements.push(
             <path
-              key={`part-${shape.id}-${part.id}`}
-              id={part.id}
+              key={`${part.id}`}
+              id={`${part.id}`}
               d={pathData}
-              fill="rgba(0, 255, 0, 0.3)"
-              stroke="green"
+              fill={part.mappedUnitId ? "rgba(255, 165, 0, 0.3)" : "rgba(0, 255, 0, 0.3)"}
+              stroke={part.mappedUnitId ? "orange" : "green"}
               strokeWidth="2"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePartClick(shape.id, part.id, index);
+              }}
+              onMouseOver={(e) => {
+                const unit = availableUnits.find(u => u.id === part.mappedUnitId);
+                const hoverText = part.mappedUnitId && unit 
+                  ? `Unit ${unit.name}` 
+                  : `Floor Section ${index + 1}`;
+                handleMouseOver(e, hoverText, `${part.id}`);
+              }}
+              onMouseOut={handleMouseOut}
+              style={{ cursor: 'pointer' }}
             />
           );
           
@@ -703,6 +991,80 @@ const InteractiveImageUploader = () => {
               {index+1}
             </text>
           );
+
+          // Show unit number for mapped parts
+          // if (part.mappedUnitId) {
+          //   const unit = availableUnits.find(u => u.id === part.mappedUnitId);
+          //   if (unit) {
+          //     elements.push(
+          //       <text
+          //         key={`unit-text-${shape.id}-${part.id}`}
+          //         x={part.points[0].x + 10}
+          //         y={part.points[0].y - 10}
+          //         fontSize="12"
+          //         fill="black"
+          //         fontWeight="bold"
+          //         textAnchor="start"
+          //         dominantBaseline="middle"
+          //         style={{ pointerEvents: 'none' }}
+          //       >
+          //         Unit {unit.name}
+          //       </text>
+          //     );
+          //   }
+          // }
+        });
+      }
+
+      // Render splits created by split mode
+      if (shape.splits && shape.splits.length > 0) {
+        shape.splits.forEach((split, index) => {
+          const pathData = `M ${split.points.map(p => `${p.x} ${p.y}`).join(' L ')} Z`;
+          elements.push(
+            <path
+              key={`split-${shape.id}-${split.id}`}
+              id={`split-${shape.id}-${split.id}`}
+              d={pathData}
+              fill={split.mappedUnitId ? "rgba(255, 165, 0, 0.3)" : "rgba(0, 255, 255, 0.3)"}
+              stroke={split.mappedUnitId ? "orange" : "cyan"}
+              strokeWidth="2"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSplitClick(shape.id, split.id, index);
+              }}
+              onMouseOver={(e) => {
+                const unit = availableUnits.find(u => u.id === split.mappedUnitId);
+                const hoverText = split.mappedUnitId && unit 
+                  ? `Unit ${unit.name}` 
+                  : `Split Section ${index + 1}`;
+                handleMouseOver(e, hoverText, `split-${shape.id}-${split.id}`);
+              }}
+              onMouseOut={handleMouseOut}
+              style={{ cursor: 'pointer' }}
+            />
+          );
+
+          // Show unit number for mapped splits
+          if (split.mappedUnitId) {
+            const unit = availableUnits.find(u => u.id === split.mappedUnitId);
+            if (unit) {
+              elements.push(
+                <text
+                  key={`unit-text-split-${shape.id}-${split.id}`}
+                  x={split.points[0].x + 10}
+                  y={split.points[0].y - 10}
+                  fontSize="12"
+                  fill="black"
+                  fontWeight="bold"
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  Unit {unit.unit_number}
+                </text>
+              );
+            }
+          }
         });
       }
 
@@ -762,19 +1124,50 @@ const InteractiveImageUploader = () => {
       );
     } else if (shape.type === 'freeform') {
       // Render freeform shape as a path
-      const pathData = `M ${shape.points.map(p => `${p.x} ${p.y}`).join(' L ')}`;
+      const pathData = shape.isClosed 
+        ? `M ${shape.points.map(p => `${p.x} ${p.y}`).join(' L ')} Z`
+        : `M ${shape.points.map(p => `${p.x} ${p.y}`).join(' L ')}`;
       return (
         <g key={shape.id}>
           <path
-            id={shape.name}
+            id={shape.id.toString()}
             d={pathData}
-            fill="none"
-            stroke="green"
+            fill={shape.isClosed ? (shape.mappedUnitId ? "rgba(255, 165, 0, 0.3)" : "rgba(0, 255, 0, 0.2)") : "none"}
+            stroke={shape.mappedUnitId ? "orange" : "green"}
             strokeWidth="3"
-            onClick={(e) => handleShapeBorderClick(e, shape.id)}
-            onMouseOver={(e) => handleMouseOver(e, shape.name, shape.id.toString())}
+            onClick={(e) => {
+              if (!shape.isClosed) {
+                handleShapeBorderClick(e, shape.id);
+              }
+            }}
+            onMouseOver={(e) => {
+              const unit = availableUnits.find(u => u.id === shape.mappedUnitId);
+              const hoverText = shape.mappedUnitId && unit 
+                ? `Unit ${unit.unit_number} - ${unit.unit_type}` 
+                : shape.name;
+              handleMouseOver(e, hoverText, shape.id.toString());
+            }}
             onMouseOut={handleMouseOut}
+            style={{ cursor: shape.isClosed ? 'pointer' : 'default' }}
           />
+          {/* Show unit number for mapped units */}
+          {shape.isClosed && shape.mappedUnitId && (() => {
+            const unit = availableUnits.find(u => u.id === shape.mappedUnitId);
+            return unit ? (
+              <text
+                x={shape.points[0].x + 10}
+                y={shape.points[0].y - 10}
+                fontSize="12"
+                fill="black"
+                fontWeight="bold"
+                textAnchor="start"
+                dominantBaseline="middle"
+                style={{ pointerEvents: 'none' }}
+              >
+                Unit {unit.unit_number}
+              </text>
+            ) : null;
+          })()}
           {/* Show only the last unpaired border point as a red dot */}
           {shape.borderPoints && shape.borderPoints.length % 2 === 1 && (() => {
             const lastIndex = shape.borderPoints.length - 1;
@@ -933,6 +1326,54 @@ const InteractiveImageUploader = () => {
     handleFloorModalClose();
   };
 
+  const handleUnitMappingModalClose = () => {
+    setUnitMappingModalOpen(false);
+    setSelectedShapeId(null);
+    setSelectedPartId(null);
+    setSelectedSplitId(null);
+    setSelectedUnitId('');
+  };
+
+  const handleUnitMappingSubmit = () => {
+    if (!selectedShapeId || !selectedUnitId) return;
+    
+    setShapes(prevShapes =>
+      prevShapes.map(shape => {
+        if (shape.id === selectedShapeId) {
+          if (selectedPartId) {
+            // Map unit to a specific part
+            return {
+              ...shape,
+              parts: shape.parts?.map(part => 
+                part.id === selectedPartId 
+                  ? { ...part, mappedUnitId: selectedUnitId }
+                  : part
+              )
+            };
+          } else if (selectedSplitId) {
+            // Map unit to a specific split
+            return {
+              ...shape,
+              splits: shape.splits?.map(split => 
+                split.id === selectedSplitId 
+                  ? { ...split, mappedUnitId: selectedUnitId }
+                  : split
+              )
+            };
+          } else {
+            // Map unit to the entire shape
+            return {
+              ...shape,
+              mappedUnitId: selectedUnitId
+            };
+          }
+        }
+        return shape;
+      })
+    );
+    handleUnitMappingModalClose();
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 55}}>
@@ -1045,7 +1486,7 @@ const InteractiveImageUploader = () => {
             </IconButton>
           </Tooltip>
 
-          <Tooltip title={enableFloorPartitioning ? "Disable floor partitioning" : "Enable floor partitioning"}>
+          {/* <Tooltip title={enableFloorPartitioning ? "Disable floor partitioning" : "Enable floor partitioning"}>
             <IconButton 
               onClick={() => setEnableFloorPartitioning(!enableFloorPartitioning)}
               color={enableFloorPartitioning ? "secondary" : "primary"}
@@ -1059,11 +1500,14 @@ const InteractiveImageUploader = () => {
             >
               <LayersIcon />
             </IconButton>
-          </Tooltip>
+          </Tooltip> */}
 
-          <Tooltip title={dotMode ? "Disable dot mode" : "Enable dot mode (place points)"}>
+          {/* <Tooltip title={dotMode ? "Disable dot mode" : "Enable dot mode (place points)"}>
             <IconButton
-              onClick={() => setDotMode(!dotMode)}
+              onClick={() => {
+                setDotMode(!dotMode);
+                setSplitMode(false);
+              }}
               color={dotMode ? 'secondary' : 'primary'}
               sx={{
                 border: '1px solid',
@@ -1073,17 +1517,45 @@ const InteractiveImageUploader = () => {
             >
               <ShowChartIcon />
             </IconButton>
+          </Tooltip> */}
+
+          <Tooltip title={splitMode ? "Disable split mode" : "Enable split mode (draw lines to split floors)"}>
+            <IconButton
+              onClick={() => {
+                setSplitMode(!splitMode);
+                setDotMode(false);
+                if (splitMode) {
+                  setSplitLines([]);
+                }
+              }}
+              color={splitMode ? 'secondary' : 'primary'}
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                '&:hover': { backgroundColor: 'action.hover' }
+              }}
+            >
+              <CropFreeIcon />
+            </IconButton>
           </Tooltip>
 
-          <Button
+          {/* <Button
             variant="outlined"
             onClick={() => setDotPoints([])}
             disabled={dotPoints.length === 0}
           >
             Clear Dots
-          </Button>
+          </Button> */}
 
           <Button
+            variant="outlined"
+            onClick={() => setSplitLines([])}
+            disabled={splitLines.length === 0}
+          >
+            Clear Splits
+          </Button>
+
+          {/* <Button
             variant="contained"
             disabled={dotPoints.length < 2}
             onClick={() => {
@@ -1102,7 +1574,7 @@ const InteractiveImageUploader = () => {
             }}
           >
             Draw line through dots
-          </Button>
+          </Button> */}
 
           <Button
             variant="contained"
@@ -1157,6 +1629,66 @@ const InteractiveImageUploader = () => {
         </Box>
       </Modal>
 
+      <Modal open={unitMappingModalOpen} onClose={handleUnitMappingModalClose}>
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4,
+          borderRadius: 2,
+          minWidth: 400,
+          maxWidth: 500,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}>
+          <Typography variant="h6">
+            {selectedPartId ? 'Map Unit to Floor Section' : 
+             selectedSplitId ? 'Map Unit to Split Section' : 
+             'Map Unit to Shape'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {selectedPartId 
+              ? 'Select a unit to map to this floor section'
+              : selectedSplitId
+              ? 'Select a unit to map to this split section'
+              : 'Select a unit to map to this closed shape'
+            }
+          </Typography>
+          <FormControl fullWidth>
+            <InputLabel>Select Unit</InputLabel>
+            <Select
+              value={selectedUnitId}
+              label="Select Unit"
+              onChange={(e) => setSelectedUnitId(e.target.value)}
+            >
+              {availableUnits.length > 0 ? (
+                availableUnits.map((unit) => (
+                  <MenuItem key={unit.id} value={unit.id}>
+                    Unit {unit.name}
+                  </MenuItem>
+                ))
+              ) : (
+                <MenuItem disabled>No units available</MenuItem>
+              )}
+            </Select>
+          </FormControl>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+            <Button onClick={handleUnitMappingModalClose}>Cancel</Button>
+            <Button 
+              variant="contained" 
+              onClick={handleUnitMappingSubmit} 
+              disabled={!selectedUnitId}
+            >
+              Map Unit
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+
       <div style={{ position: 'relative', width: '100%', height: 'auto' }}>
         {imageSrc && (
           <>
@@ -1202,6 +1734,22 @@ const InteractiveImageUploader = () => {
               }}
             >
               {shapes.map(renderShape)}
+              
+              {/* Render split lines */}
+              {splitLines.map((line, index) => (
+                <line
+                  key={`split-line-${line.id}`}
+                  x1={line.start.x}
+                  y1={line.start.y}
+                  x2={line.end.x}
+                  y2={line.end.y}
+                  stroke="red"
+                  strokeWidth="3"
+                  strokeDasharray="5,5"
+                  opacity={0.7}
+                />
+              ))}
+              
               {/* Render dot points */}
               {dotPoints.map((pt, idx) => (
                 <circle key={`dot-${idx}`} cx={pt.x} cy={pt.y} r={4} fill="red" stroke="darkred" strokeWidth="1" />

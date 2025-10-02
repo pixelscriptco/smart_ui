@@ -632,7 +632,7 @@ const Units: React.FC = () => {
                       {unit.slug??unit.name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      Unit {unit.number}
+                      Unit {unit.name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       Type: {unit.unit_plans?.type || 'N/A'}

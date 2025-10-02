@@ -125,6 +125,19 @@ const InteractiveImageUploader = () => {
           const d = path.getAttribute('d');
           if (d) {
             const points = parsePathToPoints(d);
+            
+            // Calculate center point for distance calculation
+            const centerX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+            const centerY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+            const distances = getDistancesFromSides({ x: centerX, y: centerY }, 4000, 2250);
+            console.log(distances);
+            
+            // Add distance data to the SVG element
+            const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
+            desc.setAttribute('data-distance', 'true');
+            desc.textContent = `left:${distances.left.toFixed(2)},right:${distances.right.toFixed(2)},top:${distances.top.toFixed(2)},bottom:${distances.bottom.toFixed(2)}`;
+            path.appendChild(desc);
+            
             parsedShapes.push({
               id: Date.now() + index,
               type: 'polygon',
@@ -137,12 +150,28 @@ const InteractiveImageUploader = () => {
 
         // Parse lines
         lines.forEach((line, index) => {
+          const x1 = parseFloat(line.getAttribute('x1') || '0');
+          const y1 = parseFloat(line.getAttribute('y1') || '0');
+          const x2 = parseFloat(line.getAttribute('x2') || '0');
+          const y2 = parseFloat(line.getAttribute('y2') || '0');
+          
+          // Calculate midpoint for distance calculation
+          const midX = (x1 + x2) / 2;
+          const midY = (y1 + y2) / 2;
+          const distances = getDistancesFromSides({ x: midX, y: midY }, 4000, 2250);
+          
+          // Add distance data to the SVG element
+          const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
+          desc.setAttribute('data-distance', 'true');
+          desc.textContent = `left:${distances.left.toFixed(2)},right:${distances.right.toFixed(2)},top:${distances.top.toFixed(2)},bottom:${distances.bottom.toFixed(2)}`;
+          line.appendChild(desc);
+          
           parsedShapes.push({
             id: Date.now() + index + paths.length,
             type: 'line',
             points: [
-              { x: parseFloat(line.getAttribute('x1') || '0'), y: parseFloat(line.getAttribute('y1') || '0') },
-              { x: parseFloat(line.getAttribute('x2') || '0'), y: parseFloat(line.getAttribute('y2') || '0') }
+              { x: x1, y: y1 },
+              { x: x2, y: y2 }
             ],
             name: line.id
           });
@@ -154,6 +183,17 @@ const InteractiveImageUploader = () => {
           const y = parseFloat(rect.getAttribute('y') || '0');
           const width = parseFloat(rect.getAttribute('width') || '0');
           const height = parseFloat(rect.getAttribute('height') || '0');
+          
+          // Calculate center point for distance calculation
+          const centerX = x + width / 2;
+          const centerY = y + height / 2;
+          const distances = getDistancesFromSides({ x: centerX, y: centerY }, 4000, 2250);
+          
+          // Add distance data to the SVG element
+          const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
+          desc.setAttribute('data-distance', 'true');
+          desc.textContent = `left:${distances.left.toFixed(2)},right:${distances.right.toFixed(2)},top:${distances.top.toFixed(2)},bottom:${distances.bottom.toFixed(2)}`;
+          rect.appendChild(desc);
           
           parsedShapes.push({
             id: Date.now() + index + paths.length + lines.length,
@@ -167,6 +207,11 @@ const InteractiveImageUploader = () => {
         });
 
         setExistingShapes(parsedShapes);
+        
+        // Update SVG content with distance data
+        const updatedSvgString = new XMLSerializer().serializeToString(svgDoc);
+        setSvgContent(updatedSvgString);
+        
         setIsExistingBuilding(true);
       } catch (err) {
         console.error("Error fetching building data:", err);
@@ -320,11 +365,31 @@ const InteractiveImageUploader = () => {
       // For each shape, add a <desc> tag with distances
       shapes.forEach(shape => {
         let point: { x: number; y: number };
-        if (shape.type === 'polygon' || shape.type === 'line') {
-          point = shape.points[0];
+        
+        // Calculate distances for different shape types
+        if (shape.type === 'polygon') {
+          // For polygons, use the center point
+          const centerX = shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
+          const centerY = shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length;
+          point = { x: centerX, y: centerY };
+        } else if (shape.type === 'line') {
+          // For lines, use the midpoint
+          const [start, end] = shape.points;
+          point = { 
+            x: (start.x + end.x) / 2, 
+            y: (start.y + end.y) / 2 
+          };
+        } else if (shape.type === 'rectangle') {
+          // For rectangles, use the center
+          const [start, end] = shape.points;
+          point = { 
+            x: (start.x + end.x) / 2, 
+            y: (start.y + end.y) / 2 
+          };
         } else {
           point = shape.points[0];
         }
+        
         const distances = getDistancesFromSides(point, svgWidth, svgHeight);
 
         // Find the SVG element by id (name)
@@ -332,7 +397,7 @@ const InteractiveImageUploader = () => {
         if (el) {
           const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
           desc.setAttribute('data-distance', 'true');
-          desc.textContent = `left:${distances.left},right:${distances.right},top:${distances.top},bottom:${distances.bottom}`;
+          desc.textContent = `left:${distances.left.toFixed(2)},right:${distances.right.toFixed(2)},top:${distances.top.toFixed(2)},bottom:${distances.bottom.toFixed(2)}`;
           el.appendChild(desc);
         }
       });

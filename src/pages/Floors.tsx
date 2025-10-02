@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Snackbar,Box, Button, Typography, Paper, CircularProgress, Alert, ToggleButton, ToggleButtonGroup, IconButton, Tooltip, InputLabel, TextField, Select, MenuItem, FormControl, SelectChangeEvent, Checkbox, Stack, Modal, List, ListItem, ListItemText, ListItemButton } from '@mui/material';
-import { CloudUpload as CloudUploadIcon, Save as SaveIcon, Straighten as LineIcon, Rectangle as RectangleIcon, Undo as UndoIcon, ArrowBack as ArrowBackIcon, Apartment as ApartmentIcon, Add as AddIcon } from '@mui/icons-material';
+import { Bungalow as BungalowIcon,CloudUpload as CloudUploadIcon, Save as SaveIcon, Straighten as LineIcon, Rectangle as RectangleIcon, Undo as UndoIcon, ArrowBack as ArrowBackIcon, Apartment as ApartmentIcon, Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
 import axiosInstance from '../utils/axios';
 import { useNavigate,useParams } from 'react-router-dom';
 import './Floors.css';
 
+interface FloorPlan {
+  id: string;
+  name: string;
+}
 interface Floor {
   id: string;
   number: number;
   name: string;
   units: number;
-  floor_plan_id: string;
+  floor_plan_id: string | null;
+  floor_plan?: FloorPlan;
 }
 
 interface Building {
@@ -51,6 +56,7 @@ const Floors: React.FC = () => {
   const [selectedFloorPlan, setSelectedFloorPlan] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [openSnackbar, setOpenSnackbar] = useState(false);
+  const [isEditingMode, setIsEditingMode] = useState(false);
   const navigate = useNavigate();
   const { project_id } = useParams();
 
@@ -152,11 +158,30 @@ const Floors: React.FC = () => {
       return;
     }
 
-  setLoadingFloorPlans(true);
+    setIsEditingMode(false);
+    setLoadingFloorPlans(true);
     try {
       const response = await axiosInstance.get(`/api/floors/${project_id}/floorplans`);
       setFloorPlans(response.data.floorPlans);
       setShowFloorPlansModal(true);
+    } catch (err) {
+      console.error('Error fetching floor plans:', err);
+      setError('Failed to load floor plans');
+    } finally {
+      setLoadingFloorPlans(false);
+    }
+  };
+
+  const handleEditFloorPlan = async (floorId: string) => {
+    console.log('Edit floor plan clicked for floor:', floorId);
+    setIsEditingMode(true);
+    setLoadingFloorPlans(true);
+    try {
+      const response = await axiosInstance.get(`/api/floors/${project_id}/floorplans`);
+      setFloorPlans(response.data.floorPlans);
+      setSelectedFloors([floorId]); // Select only the current floor for editing
+      setShowFloorPlansModal(true);
+      console.log('Modal should be open now');
     } catch (err) {
       console.error('Error fetching floor plans:', err);
       setError('Failed to load floor plans');
@@ -178,6 +203,7 @@ const Floors: React.FC = () => {
       });
 
       setOpenSnackbar(true);
+      setSuccessMessage(isEditingMode ? 'Floor plan updated successfully!' : 'Floor plans assigned successfully!');
 
       // Automatically close after 30 seconds
       setTimeout(() => {
@@ -186,6 +212,7 @@ const Floors: React.FC = () => {
       
       setShowFloorPlansModal(false);
       setSelectedFloorPlan(null);
+      setIsEditingMode(false);
 
       // Refresh floors after saving
       const response = await axiosInstance.get(`/api/towers/${selectedTower}/floors`);
@@ -223,6 +250,13 @@ const Floors: React.FC = () => {
           Manage Floors
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<BungalowIcon />}
+            onClick={() => navigate(`/projects/${project_id}/floor-plans`)}
+          >
+            View Floor Plans
+          </Button>
           <Button
             variant="contained"
             color="primary"
@@ -329,22 +363,50 @@ const Floors: React.FC = () => {
                   }}
                 >
                   <Checkbox
-                    checked={selectedFloors.includes(floor.id) || floor.floor_plan_id !== null}
+                    checked={selectedFloors.includes(floor.id)}
                     onChange={() => handleFloorSelection(floor.id)}
                     sx={{ position: 'absolute', top: 8, right: 8 }}
                   />
                   <Typography variant="h6">{floor.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Floor {floor.number}
-                  </Typography>
+                  {floor.floor_plan_id && floor.floor_plan && (
+                    <Typography variant="body2" color="text.secondary" >
+                      Floor Plan: {floor.floor_plan.name}
+                    </Typography>
+                  )}
+                  {!floor.floor_plan_id && (
+                    <Typography variant="body2" color="text.secondary" >
+                      No Floor Plan Assigned
+                    </Typography>
+                  )}
                   <Box sx={{ mt: 'auto', display: 'flex', gap: 1 }}>
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      onClick={() => navigate(`/projects/${project_id}/floor-plan/${floor.id}`)}
-                    >
-                      View Floor Plan
-                    </Button>
+                    {floor.floor_plan_id ? (
+                      <>
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          onClick={() => navigate(`/projects/${project_id}/floor-plan/${floor.id}`)}
+                        >
+                          View 
+                        </Button>
+                        {/* <Button
+                          variant="outlined"
+                          startIcon={<EditIcon />}
+                          fullWidth
+                          onClick={() => handleEditFloorPlan(floor.id)}
+                        >
+                          Edit
+                        </Button> */}
+                      </>
+                    ) : (
+                      <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        fullWidth
+                        onClick={() => handleAddFloorPlan}
+                      >
+                        Create Floor Plan
+                      </Button>
+                    )}
                   </Box>
                 </Paper>
               ))}
@@ -358,6 +420,7 @@ const Floors: React.FC = () => {
         onClose={() => {
           setShowFloorPlansModal(false);
           setSelectedFloorPlan(null);
+          setIsEditingMode(false);
         }}
         aria-labelledby="floor-plans-modal"
       >
@@ -373,7 +436,7 @@ const Floors: React.FC = () => {
           borderRadius: 1,
         }}>
           <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
-            Select Floor Plan
+            {isEditingMode ? 'Edit Floor Plan' : 'Select Floor Plan'}
           </Typography>
           {loadingFloorPlans ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
@@ -410,6 +473,7 @@ const Floors: React.FC = () => {
             <Button onClick={() => {
               setShowFloorPlansModal(false);
               setSelectedFloorPlan(null);
+              setIsEditingMode(false);
             }}>
               Cancel
             </Button>
@@ -434,7 +498,7 @@ const Floors: React.FC = () => {
           onClose={() => setOpenSnackbar(false)}
           sx={{ width: '100%' }}
         >
-          Floor plans assigned successfully!
+          {successMessage}
         </Alert>
       </Snackbar>
     </Box>

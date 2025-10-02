@@ -23,6 +23,7 @@ import FloorPlan from './pages/FloorPlan';
 import Units from './pages/Units';
 import AddUnitPlan from './pages/AddUnitPlan';
 import UnitPlans from './pages/UnitPlans';
+import FloorPlans from './pages/FloorPlans';
 import Clients from './pages/Clients';
 import Enquiries from './pages/Enquiries';
 import UnitDetails from './pages/UnitDetails';
@@ -213,6 +214,16 @@ const AppRoutes = () => {
             element={
               isAuthenticated ? (
                 <UnitPlans />
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+          <Route
+            path="/projects/:project_id/floor-plans"
+            element={
+              isAuthenticated ? (
+                <FloorPlans />
               ) : (
                 <Navigate to="/login" replace />
               )

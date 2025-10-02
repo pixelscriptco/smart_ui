@@ -30,7 +30,6 @@ internalPoints?: Point[];
 borderPoints?: Point[];
 connectingLines?: ConnectingLine[];
 parts?: { id: string; points: Point[]; mappedUnitId?: string }[];
-splits?: { id: string; points: Point[]; mappedUnitId?: string }[];
 mappedUnitId?: string;
 };
 
@@ -65,12 +64,9 @@ const InteractiveImageUploader = () => {
   const newLineIdRef = useRef<number | null>(null);
   const [dotMode, setDotMode] = useState(false);
   const [dotPoints, setDotPoints] = useState<Point[]>([]);
-  const [splitMode, setSplitMode] = useState(false);
-  const [splitLines, setSplitLines] = useState<{ id: string; start: Point; end: Point }[]>([]);
   const [unitMappingModalOpen, setUnitMappingModalOpen] = useState(false);
   const [selectedShapeId, setSelectedShapeId] = useState<number | null>(null);
   const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
-  const [selectedSplitId, setSelectedSplitId] = useState<string | null>(null);
   const [availableUnits, setAvailableUnits] = useState<any[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string>('');
 
@@ -81,6 +77,8 @@ const InteractiveImageUploader = () => {
       reader.onload = () => {
         setImageSrc(reader.result as string);
         setIsExistingTower(false); // Reset to false for new uploads
+        setDotMode(false); // Disable dot mode for new uploads
+        setDotPoints([]); // Clear any existing dots
         setShapes([]);
         setSvgContent('');
         svgRef.current?.querySelectorAll('path, line, rect').forEach(el => el.remove());
@@ -180,35 +178,9 @@ const InteractiveImageUploader = () => {
       }
     }
 
-    // Dot placing mode: collect points only, no shapes
-    if (dotMode) {
+    // Dot placing mode: collect points only, no shapes (only available for existing buildings)
+    if (dotMode && isExistingTower) {
       setDotPoints(prev => [...prev, { x, y }]);
-      return;
-    }
-
-    // Split mode: draw lines to split floors
-    if (splitMode) {
-      const lastLine = splitLines[splitLines.length - 1];
-      
-      if (!lastLine || (lastLine.start && lastLine.end)) {
-        // Start new split line - only set start point, end will be set on next click
-        setSplitLines(prev => [...prev, { id: `split-${Date.now()}`, start: { x, y }, end: { x, y } }]);
-      } else if (lastLine && lastLine.start && lastLine.start.x === lastLine.end.x && lastLine.start.y === lastLine.end.y) {
-        // Complete the current split line
-        setSplitLines(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            ...updated[updated.length - 1],
-            end: { x, y }
-          };
-          return updated;
-        });
-        
-        // Create splits for all shapes that intersect with this line
-        setTimeout(() => {
-          createSplitsFromLine({ x, y });
-        }, 100);
-      }
       return;
     }
 
@@ -285,20 +257,6 @@ const InteractiveImageUploader = () => {
     const currentX = e.clientX - rect.left;
     const currentY = e.clientY - rect.top;
     
-    // Handle split mode line drawing
-    if (splitMode && splitLines.length > 0) {
-      const currentLine = splitLines[splitLines.length - 1];
-      if (currentLine && currentLine.start && currentLine.start.x === currentLine.end.x && currentLine.start.y === currentLine.end.y) {
-        setSplitLines(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            ...updated[updated.length - 1],
-            end: { x: currentX, y: currentY }
-          };
-          return updated;
-        });
-      }
-    }
     
     if (drawMode === 'line' && currentPolygon.length > 0) {
       // Create path for the current polygon being drawn
@@ -398,195 +356,11 @@ const InteractiveImageUploader = () => {
   const handlePartClick = (shapeId: number, partId: string, partIndex: number) => {
     setSelectedShapeId(shapeId);
     setSelectedPartId(partId);
-    setSelectedSplitId(null);
     setSelectedUnitId('');
     fetchAvailableUnits();
     setUnitMappingModalOpen(true);
   };
 
-  const handleSplitClick = (shapeId: number, splitId: string, splitIndex: number) => {
-    setSelectedShapeId(shapeId);
-    setSelectedSplitId(splitId);
-    setSelectedPartId(null);
-    setSelectedUnitId('');
-    fetchAvailableUnits();
-    setUnitMappingModalOpen(true);
-  };
-
-  const createSplitsFromLine = (endPoint: Point) => {
-    if (splitLines.length === 0) return;
-    
-    const currentLine = splitLines[splitLines.length - 1];
-    const startPoint = currentLine.start;
-    
-    console.log('Creating splits from line:', { startPoint, endPoint, shapesCount: shapes.length });
-    
-    // Find all shapes that could be split by this line
-    shapes.forEach(shape => {
-      if (shape.type === 'polygon' && shape.isClosed && shape.points) {
-        console.log('Found polygon shape:', shape.id);
-        // Create a simple split by dividing the polygon area
-        const splits = createSimpleSplits(shape.points, startPoint, endPoint);
-        console.log('Created splits:', splits);
-        
-        if (splits.length > 0) {
-          setShapes(prevShapes =>
-            prevShapes.map(s => 
-              s.id === shape.id 
-                ? { ...s, splits: splits }
-                : s
-            )
-          );
-        }
-      }
-    });
-  };
-
-  const createSimpleSplits = (polygon: Point[], lineStart: Point, lineEnd: Point): { id: string; points: Point[]; mappedUnitId?: string }[] => {
-    const splits: { id: string; points: Point[]; mappedUnitId?: string }[] = [];
-    
-    // Get polygon bounds
-    const minX = Math.min(...polygon.map(p => p.x));
-    const maxX = Math.max(...polygon.map(p => p.x));
-    const minY = Math.min(...polygon.map(p => p.y));
-    const maxY = Math.max(...polygon.map(p => p.y));
-    
-    // Create two splits based on the line direction
-    const isVertical = Math.abs(lineEnd.x - lineStart.x) < Math.abs(lineEnd.y - lineStart.y);
-    
-    if (isVertical) {
-      // Vertical line - split left and right
-      const splitX = (lineStart.x + lineEnd.x) / 2;
-      
-      // Left split
-      splits.push({
-        id: `split-left-${Date.now()}`,
-        points: [
-          { x: minX, y: minY },
-          { x: splitX, y: minY },
-          { x: splitX, y: maxY },
-          { x: minX, y: maxY }
-        ],
-        mappedUnitId: undefined
-      });
-      
-      // Right split
-      splits.push({
-        id: `split-right-${Date.now()}`,
-        points: [
-          { x: splitX, y: minY },
-          { x: maxX, y: minY },
-          { x: maxX, y: maxY },
-          { x: splitX, y: maxY }
-        ],
-        mappedUnitId: undefined
-      });
-    } else {
-      // Horizontal line - split top and bottom
-      const splitY = (lineStart.y + lineEnd.y) / 2;
-      
-      // Top split
-      splits.push({
-        id: `split-top-${Date.now()}`,
-        points: [
-          { x: minX, y: minY },
-          { x: maxX, y: minY },
-          { x: maxX, y: splitY },
-          { x: minX, y: splitY }
-        ],
-        mappedUnitId: undefined
-      });
-      
-      // Bottom split
-      splits.push({
-        id: `split-bottom-${Date.now()}`,
-        points: [
-          { x: minX, y: splitY },
-          { x: maxX, y: splitY },
-          { x: maxX, y: maxY },
-          { x: minX, y: maxY }
-        ],
-        mappedUnitId: undefined
-      });
-    }
-    
-    return splits;
-  };
-
-  const findLinePolygonIntersections = (start: Point, end: Point, polygon: Point[]): Point[] => {
-    const intersections: Point[] = [];
-    
-    for (let i = 0; i < polygon.length; i++) {
-      const p1 = polygon[i];
-      const p2 = polygon[(i + 1) % polygon.length];
-      
-      const intersection = getLineIntersection(start, end, p1, p2);
-      if (intersection) {
-        intersections.push(intersection);
-      }
-    }
-    
-    return intersections;
-  };
-
-  const getLineIntersection = (line1Start: Point, line1End: Point, line2Start: Point, line2End: Point): Point | null => {
-    const x1 = line1Start.x, y1 = line1Start.y;
-    const x2 = line1End.x, y2 = line1End.y;
-    const x3 = line2Start.x, y3 = line2Start.y;
-    const x4 = line2End.x, y4 = line2End.y;
-    
-    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (Math.abs(denom) < 1e-10) return null; // Lines are parallel
-    
-    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
-    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
-    
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-      return {
-        x: x1 + t * (x2 - x1),
-        y: y1 + t * (y2 - y1)
-      };
-    }
-    
-    return null;
-  };
-
-  const dividePolygonAlongLine = (polygon: Point[], lineStart: Point, lineEnd: Point, intersections: Point[]): { id: string; points: Point[]; mappedUnitId?: string }[] => {
-    if (intersections.length < 2) return [];
-    
-    // Sort intersections along the line
-    const sortedIntersections = intersections.sort((a, b) => {
-      const distA = Math.sqrt((a.x - lineStart.x) ** 2 + (a.y - lineStart.y) ** 2);
-      const distB = Math.sqrt((b.x - lineStart.x) ** 2 + (b.y - lineStart.y) ** 2);
-      return distA - distB;
-    });
-    
-    const splits: { id: string; points: Point[]; mappedUnitId?: string }[] = [];
-    
-    // Create splits by dividing the polygon into sections
-    // For now, create a simple split that divides the polygon in half
-    const splitId = `split-${Date.now()}`;
-    
-    // Find the center point of the polygon
-    const centerX = polygon.reduce((sum, p) => sum + p.x, 0) / polygon.length;
-    const centerY = polygon.reduce((sum, p) => sum + p.y, 0) / polygon.length;
-    
-    // Create a simple rectangular split using the line
-    const splitPoints = [
-      { x: Math.min(lineStart.x, lineEnd.x), y: Math.min(lineStart.y, lineEnd.y) },
-      { x: Math.max(lineStart.x, lineEnd.x), y: Math.min(lineStart.y, lineEnd.y) },
-      { x: Math.max(lineStart.x, lineEnd.x), y: Math.max(lineStart.y, lineEnd.y) },
-      { x: Math.min(lineStart.x, lineEnd.x), y: Math.max(lineStart.y, lineEnd.y) }
-    ];
-    
-    splits.push({
-      id: splitId,
-      points: splitPoints,
-      mappedUnitId: undefined
-    });
-    
-    return splits;
-  };
 
   const handleShapeBorderClick = (e: React.MouseEvent, shapeId: number) => {
     e.stopPropagation(); // Prevent event bubbling
@@ -765,33 +539,82 @@ const InteractiveImageUploader = () => {
       const svgWidth = img?.naturalWidth || 4000;
       const svgHeight = img?.naturalHeight || 2250;
 
-
+      // Remove existing distance descriptions
       svgElement.querySelectorAll('desc[data-distance]').forEach(desc => desc.remove());
 
-      // For each shape, add a <desc> tag with distances
-      shapes.forEach(shape => {
-        let point: { x: number; y: number };
-        if (shape.type === 'polygon' || shape.type === 'line') {
-          point = shape.points[0];
+      // Create a new SVG element to merge existing and new content
+      let finalSvgContent = '';
+      
+      if (isExistingTower && svgContent) {
+        // If editing existing building, merge existing SVG with new shapes
+        const existingSvg = new DOMParser().parseFromString(svgContent, 'image/svg+xml');
+        const existingSvgElement = existingSvg.querySelector('svg');
+        
+        if (existingSvgElement) {
+          // Get the new shapes from current SVG
+          const newShapes = svgElement.querySelectorAll('path, line, rect, circle, text');
+          
+          // Append new shapes to existing SVG
+          newShapes.forEach(shape => {
+            const clonedShape = shape.cloneNode(true);
+            existingSvgElement.appendChild(clonedShape);
+          });
+          
+          // Add distance descriptions to new shapes
+          shapes.forEach(shape => {
+            let point: { x: number; y: number };
+            if (shape.type === 'polygon' || shape.type === 'line') {
+              point = shape.points[0];
+            } else {
+              point = shape.points[0];
+            }
+            const distances = getDistancesFromSides(point, svgWidth, svgHeight);
+
+            // Find the SVG element by id (name) - only if shape has a valid name
+            if (shape.name && shape.name.trim()) {
+              const el = existingSvgElement.querySelector(`#${CSS.escape(shape.name)}`);
+              if (el) {
+                const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
+                desc.setAttribute('data-distance', 'true');
+                desc.textContent = `left:${distances.left},right:${distances.right},top:${distances.top},bottom:${distances.bottom}`;
+                el.appendChild(desc);
+              }
+            }
+          });
+          
+          finalSvgContent = new XMLSerializer().serializeToString(existingSvgElement);
         } else {
-          point = shape.points[0];
+          // Fallback to current SVG if existing SVG is malformed
+          finalSvgContent = new XMLSerializer().serializeToString(svgElement);
         }
-        const distances = getDistancesFromSides(point, svgWidth, svgHeight);
-
-        // Find the SVG element by id (name) - only if shape has a valid name
-        if (shape.name && shape.name.trim()) {
-          const el = svgElement.querySelector(`#${CSS.escape(shape.name)}`);
-        if (el) {
-          const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
-          desc.setAttribute('data-distance', 'true');
-          desc.textContent = `left:${distances.left},right:${distances.right},top:${distances.top},bottom:${distances.bottom}`;
-          el.appendChild(desc);
+      } else {
+        // For new buildings, use current SVG
+        // For each shape, add a <desc> tag with distances
+        shapes.forEach(shape => {
+          let point: { x: number; y: number };
+          if (shape.type === 'polygon' || shape.type === 'line') {
+            point = shape.points[0];
+          } else {
+            point = shape.points[0];
           }
-        }
-      });
+          const distances = getDistancesFromSides(point, svgWidth, svgHeight);
 
+          // Find the SVG element by id (name) - only if shape has a valid name
+          if (shape.name && shape.name.trim()) {
+            const el = svgElement.querySelector(`#${CSS.escape(shape.name)}`);
+            if (el) {
+              const desc = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
+              desc.setAttribute('data-distance', 'true');
+              desc.textContent = `left:${distances.left},right:${distances.right},top:${distances.top},bottom:${distances.bottom}`;
+              el.appendChild(desc);
+            }
+          }
+        });
 
-      const svgString = new XMLSerializer().serializeToString(svgElement);
+        finalSvgContent = new XMLSerializer().serializeToString(svgElement);
+      }
+
+      const svgString = finalSvgContent;
       const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
       // const pathIds = Array.from(svgElement.querySelectorAll('path'))
       //                  .map(el => el.id)
@@ -806,6 +629,7 @@ const InteractiveImageUploader = () => {
       formData.append('svg', svgBlob, 'building.svg');
       formData.append('tower_id', tower_id as string);
       formData.append('direction', direction);
+      formData.append('isExistingTower', isExistingTower.toString());
 
       await axiosInstance.post('/api/towers', formData, {
         headers: {
@@ -950,7 +774,7 @@ const InteractiveImageUploader = () => {
           elements.push(
             <path
               key={`${part.id}`}
-              id={`${part.id}`}
+              id={part.mappedUnitId ? 'U-'+part.mappedUnitId : part.id}
               d={pathData}
               fill={part.mappedUnitId ? "rgba(255, 165, 0, 0.3)" : "rgba(0, 255, 0, 0.3)"}
               stroke={part.mappedUnitId ? "orange" : "green"}
@@ -1016,57 +840,6 @@ const InteractiveImageUploader = () => {
         });
       }
 
-      // Render splits created by split mode
-      if (shape.splits && shape.splits.length > 0) {
-        shape.splits.forEach((split, index) => {
-          const pathData = `M ${split.points.map(p => `${p.x} ${p.y}`).join(' L ')} Z`;
-          elements.push(
-            <path
-              key={`split-${shape.id}-${split.id}`}
-              id={`split-${shape.id}-${split.id}`}
-              d={pathData}
-              fill={split.mappedUnitId ? "rgba(255, 165, 0, 0.3)" : "rgba(0, 255, 255, 0.3)"}
-              stroke={split.mappedUnitId ? "orange" : "cyan"}
-              strokeWidth="2"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSplitClick(shape.id, split.id, index);
-              }}
-              onMouseOver={(e) => {
-                const unit = availableUnits.find(u => u.id === split.mappedUnitId);
-                const hoverText = split.mappedUnitId && unit 
-                  ? `Unit ${unit.name}` 
-                  : `Split Section ${index + 1}`;
-                handleMouseOver(e, hoverText, `split-${shape.id}-${split.id}`);
-              }}
-              onMouseOut={handleMouseOut}
-              style={{ cursor: 'pointer' }}
-            />
-          );
-
-          // Show unit number for mapped splits
-          if (split.mappedUnitId) {
-            const unit = availableUnits.find(u => u.id === split.mappedUnitId);
-            if (unit) {
-              elements.push(
-                <text
-                  key={`unit-text-split-${shape.id}-${split.id}`}
-                  x={split.points[0].x + 10}
-                  y={split.points[0].y - 10}
-                  fontSize="12"
-                  fill="black"
-                  fontWeight="bold"
-                  textAnchor="start"
-                  dominantBaseline="middle"
-                  style={{ pointerEvents: 'none' }}
-                >
-                  Unit {unit.unit_number}
-                </text>
-              );
-            }
-          }
-        });
-      }
 
       return elements;
     } else if (shape.type === 'line' || shape.type === 'simple-line') {      
@@ -1130,7 +903,7 @@ const InteractiveImageUploader = () => {
       return (
         <g key={shape.id}>
           <path
-            id={shape.id.toString()}
+            id={'U-'+shape.mappedUnitId || shape.id.toString()}
             d={pathData}
             fill={shape.isClosed ? (shape.mappedUnitId ? "rgba(255, 165, 0, 0.3)" : "rgba(0, 255, 0, 0.2)") : "none"}
             stroke={shape.mappedUnitId ? "orange" : "green"}
@@ -1143,7 +916,7 @@ const InteractiveImageUploader = () => {
             onMouseOver={(e) => {
               const unit = availableUnits.find(u => u.id === shape.mappedUnitId);
               const hoverText = shape.mappedUnitId && unit 
-                ? `Unit ${unit.unit_number} - ${unit.unit_type}` 
+                ? `Unit ${unit.name}` 
                 : shape.name;
               handleMouseOver(e, hoverText, shape.id.toString());
             }}
@@ -1164,7 +937,7 @@ const InteractiveImageUploader = () => {
                 dominantBaseline="middle"
                 style={{ pointerEvents: 'none' }}
               >
-                Unit {unit.unit_number}
+                Unit {unit.name}
               </text>
             ) : null;
           })()}
@@ -1330,7 +1103,6 @@ const InteractiveImageUploader = () => {
     setUnitMappingModalOpen(false);
     setSelectedShapeId(null);
     setSelectedPartId(null);
-    setSelectedSplitId(null);
     setSelectedUnitId('');
   };
 
@@ -1346,28 +1118,18 @@ const InteractiveImageUploader = () => {
               ...shape,
               parts: shape.parts?.map(part => 
                 part.id === selectedPartId 
-                  ? { ...part, mappedUnitId: selectedUnitId }
+                  ? { ...part, id: selectedUnitId, mappedUnitId: selectedUnitId }
                   : part
               )
             };
-          } else if (selectedSplitId) {
-            // Map unit to a specific split
-            return {
-              ...shape,
-              splits: shape.splits?.map(split => 
-                split.id === selectedSplitId 
-                  ? { ...split, mappedUnitId: selectedUnitId }
-                  : split
-              )
-            };
-          } else {
+          } else {            
             // Map unit to the entire shape
             return {
               ...shape,
               mappedUnitId: selectedUnitId
             };
           }
-        }
+        }        
         return shape;
       })
     );
@@ -1426,48 +1188,26 @@ const InteractiveImageUploader = () => {
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <input
-            type="file"
-            onChange={handleImageUpload}
-            accept="image/*"
-            style={{ display: 'none' }}
-            id="floorplan-upload"
-          />
-          <label htmlFor="floorplan-upload">
-            <Button
-              variant="outlined"
-              component="span"
-              startIcon={<CloudUploadIcon />}
-            >
-              Upload Tower Image
-            </Button>
-          </label>
-
-          {/* <ToggleButtonGroup
-            value={drawMode}
-            exclusive
-            onChange={(e, value) => {
-              if (value) {
-                setDrawMode(value);
-                setCurrentPolygon([]);
-                setCurrentFreeform([]);
-              }
-            }}
-            aria-label="drawing mode"
-          >
-            <ToggleButton value="line" aria-label="draw polygon">
-              <LineIcon />
-            </ToggleButton>
-            <ToggleButton value="simple-line" aria-label="draw simple line">
-              <ShowChartIcon />
-            </ToggleButton>
-            <ToggleButton value="rectangle" aria-label="draw rectangle">
-              <RectangleIcon />
-            </ToggleButton>
-            <ToggleButton value="freeform" aria-label="draw freeform">
-              <CreateIcon />
-            </ToggleButton>
-          </ToggleButtonGroup> */}
+          {!isExistingTower && (
+            <>
+              <input
+                type="file"
+                onChange={handleImageUpload}
+                accept="image/*"
+                style={{ display: 'none' }}
+                id="floorplan-upload"
+              />
+              <label htmlFor="floorplan-upload">
+                <Button
+                  variant="outlined"
+                  component="span"
+                  startIcon={<CloudUploadIcon />}
+                >
+                  Upload Tower Image
+                </Button>
+              </label>
+            </>
+          )}
 
           <Tooltip title="Undo last action">
             <IconButton 
@@ -1486,56 +1226,25 @@ const InteractiveImageUploader = () => {
             </IconButton>
           </Tooltip>
 
-          {/* <Tooltip title={enableFloorPartitioning ? "Disable floor partitioning" : "Enable floor partitioning"}>
-            <IconButton 
-              onClick={() => setEnableFloorPartitioning(!enableFloorPartitioning)}
-              color={enableFloorPartitioning ? "secondary" : "primary"}
-              sx={{ 
-                border: '1px solid',
-                borderColor: 'divider',
-                '&:hover': {
-                  backgroundColor: 'action.hover'
-                }
-              }}
-            >
-              <LayersIcon />
-            </IconButton>
-          </Tooltip> */}
-
-          {/* <Tooltip title={dotMode ? "Disable dot mode" : "Enable dot mode (place points)"}>
+          <Tooltip title={isExistingTower ? (dotMode ? "Disable dot mode" : "Enable dot mode (place points)") : "Dot mode available only for existing buildings"}>
             <IconButton
               onClick={() => {
+                if (!isExistingTower) return;
                 setDotMode(!dotMode);
-                setSplitMode(false);
+                if (dotMode) {
+                  setDotPoints([]);
+                }
               }}
               color={dotMode ? 'secondary' : 'primary'}
+              disabled={!isExistingTower}
               sx={{
                 border: '1px solid',
                 borderColor: 'divider',
-                '&:hover': { backgroundColor: 'action.hover' }
+                '&:hover': { backgroundColor: isExistingTower ? 'action.hover' : 'default' },
+                opacity: isExistingTower ? 1 : 0.5
               }}
             >
               <ShowChartIcon />
-            </IconButton>
-          </Tooltip> */}
-
-          <Tooltip title={splitMode ? "Disable split mode" : "Enable split mode (draw lines to split floors)"}>
-            <IconButton
-              onClick={() => {
-                setSplitMode(!splitMode);
-                setDotMode(false);
-                if (splitMode) {
-                  setSplitLines([]);
-                }
-              }}
-              color={splitMode ? 'secondary' : 'primary'}
-              sx={{
-                border: '1px solid',
-                borderColor: 'divider',
-                '&:hover': { backgroundColor: 'action.hover' }
-              }}
-            >
-              <CropFreeIcon />
             </IconButton>
           </Tooltip>
 
@@ -1549,10 +1258,39 @@ const InteractiveImageUploader = () => {
 
           <Button
             variant="outlined"
-            onClick={() => setSplitLines([])}
-            disabled={splitLines.length === 0}
+            onClick={() => setDotPoints([])}
+            disabled={dotPoints.length === 0 || !isExistingTower}
           >
-            Clear Splits
+            Clear Dots
+          </Button>
+
+          <Button
+            variant="contained"
+            disabled={dotPoints.length < 3 || !isExistingTower}
+            onClick={() => {
+              if (dotPoints.length < 3) return;
+              // Create a closed loop through the dots
+              const id = Date.now();
+              const newShape: Shape = {
+                id,
+                type: 'freeform',
+                points: [...dotPoints, dotPoints[0]], // Close the loop by adding first point at the end
+                isClosed: true,
+                name: `Unit Area ${Date.now()}`
+              };
+              setShapes(prev => [...prev, newShape]);
+              setDotPoints([]);
+              setDotMode(false);
+              
+              // Open unit mapping modal for the new shape
+              setSelectedShapeId(id);
+              setSelectedPartId(null);
+              setSelectedUnitId('');
+              fetchAvailableUnits();
+              setUnitMappingModalOpen(true);
+            }}
+          >
+            Draw Loop & Map Unit
           </Button>
 
           {/* <Button
@@ -1646,15 +1384,11 @@ const InteractiveImageUploader = () => {
           gap: 2,
         }}>
           <Typography variant="h6">
-            {selectedPartId ? 'Map Unit to Floor Section' : 
-             selectedSplitId ? 'Map Unit to Split Section' : 
-             'Map Unit to Shape'}
+            {selectedPartId ? 'Map Unit to Floor Section' : 'Map Unit to Shape'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {selectedPartId 
               ? 'Select a unit to map to this floor section'
-              : selectedSplitId
-              ? 'Select a unit to map to this split section'
               : 'Select a unit to map to this closed shape'
             }
           </Typography>
@@ -1734,21 +1468,6 @@ const InteractiveImageUploader = () => {
               }}
             >
               {shapes.map(renderShape)}
-              
-              {/* Render split lines */}
-              {splitLines.map((line, index) => (
-                <line
-                  key={`split-line-${line.id}`}
-                  x1={line.start.x}
-                  y1={line.start.y}
-                  x2={line.end.x}
-                  y2={line.end.y}
-                  stroke="red"
-                  strokeWidth="3"
-                  strokeDasharray="5,5"
-                  opacity={0.7}
-                />
-              ))}
               
               {/* Render dot points */}
               {dotPoints.map((pt, idx) => (

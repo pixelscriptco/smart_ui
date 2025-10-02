@@ -39,6 +39,7 @@ import {
 import axiosInstance from '../utils/axios';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import CheckIcon from '@mui/icons-material/Check';
+import LexicalEditor from '../components/LexicalEditor';
 interface Client {
   id: number;
   name: string;
@@ -50,6 +51,8 @@ interface Client {
   company: string;
   createdAt: string;
   avatar?: string;
+  logo?: string;
+  description?: string;
 }
 
 const Clients = () => {
@@ -71,6 +74,8 @@ const Clients = () => {
     company: '',
     password:'',
     status: 'active',
+    logo: null as File | null,
+    description: '',
   });
   const [createError, setCreateError] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -88,6 +93,11 @@ const Clients = () => {
   const [mobileValidationTimeout, setMobileValidationTimeout] = useState<NodeJS.Timeout | null>(null);
   const [emailValidating, setEmailValidating] = useState(false);
   const [mobileValidating, setMobileValidating] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [editLogoPreview, setEditLogoPreview] = useState<string | null>(null);
+  const [editLogoError, setEditLogoError] = useState<string | null>(null);
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchClients();
@@ -168,17 +178,37 @@ const Clients = () => {
     setCreateError(null);
     
     // Check for validation errors
-    if (emailError || mobileError) {
+    if (emailError || mobileError || logoError) {
       setCreateError('Please fix the validation errors before creating the client');
       return;
     }
     
     try {
-      const response = await axiosInstance.post('/api/users/client', newClient);
+      const formData = new FormData();
+      formData.append('name', newClient.name);
+      formData.append('email', newClient.email);
+      formData.append('mobile', newClient.mobile);
+      formData.append('company', newClient.company);
+      formData.append('password', newClient.password);
+      formData.append('status', newClient.status);
+      formData.append('description', newClient.description);
+      
+      if (newClient.logo) {
+        formData.append('logo', newClient.logo);
+      }
+
+      const response = await axiosInstance.post('/api/users/client', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
       setCreateModalOpen(false);
-      setNewClient({ name: '', email: '', mobile: '', company: '', password: '', status: 'active' });
+      setNewClient({ name: '', email: '', mobile: '', company: '', password: '', status: 'active', logo: null, description: '' });
       setEmailError(null);
       setMobileError(null);
+      setLogoError(null);
+      setLogoPreview(null);
       fetchClients();
     } catch (err: any) {
       setCreateError(err.response?.data?.message || 'Failed to create client');
@@ -189,6 +219,9 @@ const Clients = () => {
     const client = clients.find(c => c.id === clientId);
     if (client) {
       setEditingClient(client);
+      setEditLogoPreview(client.logo || null);
+      setEditLogoFile(null);
+      setEditLogoError(null);
       setEditModalOpen(true);
     }
   };
@@ -358,6 +391,63 @@ const Clients = () => {
     
     setMobileValidationTimeout(timeout);
   };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setLogoError('Please select a valid image file');
+        setLogoPreview(null);
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setLogoError('Image size must be less than 5MB');
+        setLogoPreview(null);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewClient(prev => ({
+          ...prev,
+          logo: file
+        }));
+        setLogoPreview(reader.result as string);
+        setLogoError(null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleEditLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setEditLogoError('Please select a valid image file');
+        setEditLogoPreview(null);
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setEditLogoError('Image size must be less than 5MB');
+        setEditLogoPreview(null);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditLogoFile(file);
+        setEditLogoPreview(reader.result as string);
+        setEditLogoError(null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   
 
   return (
@@ -377,6 +467,8 @@ const Clients = () => {
             setCreateError(null);
             setEmailValidating(false);
             setMobileValidating(false);
+            setLogoError(null);
+            setLogoPreview(null);
           }}
         >
           Create New Client
@@ -393,6 +485,8 @@ const Clients = () => {
           setCreateError(null);
           setEmailValidating(false);
           setMobileValidating(false);
+          setLogoError(null);
+          setLogoPreview(null);
         }} 
         maxWidth="sm" 
         fullWidth
@@ -442,6 +536,59 @@ const Clients = () => {
               ) : null
             }}
           />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Description
+            </Typography>
+            <LexicalEditor
+              onChange={(html) => setNewClient({ ...newClient, description: html })}
+              initialValue={newClient.description}
+            />
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Logo
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <input
+                accept="image/*"
+                style={{ display: 'none' }}
+                id="logo-upload"
+                type="file"
+                onChange={handleLogoChange}
+              />
+              <label htmlFor="logo-upload">
+                <Button variant="outlined" component="span" size="small">
+                  Choose Logo
+                </Button>
+              </label>
+              {logoPreview && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <img
+                    src={logoPreview}
+                    alt="Logo preview"
+                    style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4 }}
+                  />
+                  <Button
+                    size="small"
+                    color="error"
+                    onClick={() => {
+                      setLogoPreview(null);
+                      setNewClient(prev => ({ ...prev, logo: null }));
+                      setLogoError(null);
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </Box>
+              )}
+            </Box>
+            {logoError && (
+              <Typography color="error" variant="caption">
+                {logoError}
+              </Typography>
+            )}
+          </Box>
           <TextField
             label="Company"
             value={newClient.company}
@@ -470,7 +617,7 @@ const Clients = () => {
           <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
           <Tooltip 
             title={
-              emailError || mobileError 
+              emailError || mobileError || logoError
                 ? 'Please fix the validation errors before creating the client'
                 : !newClient.name || !newClient.email || !newClient.mobile || !newClient.password
                 ? 'Please fill in all required fields'
@@ -486,6 +633,7 @@ const Clients = () => {
                 disabled={
                   !!emailError || 
                   !!mobileError || 
+                  !!logoError ||
                   !newClient.name || 
                   !newClient.email || 
                   !newClient.mobile || 
@@ -501,7 +649,12 @@ const Clients = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={editModalOpen} onClose={() => setEditModalOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={editModalOpen} onClose={() => {
+        setEditModalOpen(false);
+        setEditLogoPreview(null);
+        setEditLogoFile(null);
+        setEditLogoError(null);
+      }} maxWidth="sm" fullWidth>
         <DialogTitle>Edit Client</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
           {editingClient && (
@@ -542,6 +695,59 @@ const Clients = () => {
                 }
                 fullWidth
               />
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Description
+                </Typography>
+                <LexicalEditor
+                  onChange={(html) => setEditingClient({ ...editingClient, description: html })}
+                  initialValue={editingClient.description || ''}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Logo
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <input
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    id="edit-logo-upload"
+                    type="file"
+                    onChange={handleEditLogoChange}
+                  />
+                  <label htmlFor="edit-logo-upload">
+                    <Button variant="outlined" component="span" size="small">
+                      {editLogoPreview ? 'Change Logo' : 'Choose Logo'}
+                    </Button>
+                  </label>
+                  {editLogoPreview && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <img
+                        src={editLogoPreview}
+                        alt="Logo preview"
+                        style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4 }}
+                      />
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => {
+                          setEditLogoPreview(null);
+                          setEditLogoFile(null);
+                          setEditLogoError(null);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </Box>
+                  )}
+                </Box>
+                {editLogoError && (
+                  <Typography color="error" variant="caption">
+                    {editLogoError}
+                  </Typography>
+                )}
+              </Box>
               <FormControl fullWidth>
                 <InputLabel>Status</InputLabel>
                 <Select
@@ -568,14 +774,33 @@ const Clients = () => {
             onClick={async () => {
               try {
                 if (editingClient) {
-                  await axiosInstance.patch(`/api/users/clients/${editingClient.id}`, editingClient);
+                  const formData = new FormData();
+                  formData.append('name', editingClient.name);
+                  formData.append('mobile', editingClient.mobile);
+                  formData.append('company', editingClient.company);
+                  formData.append('status', editingClient.status);
+                  formData.append('description', editingClient.description || '');
+                  
+                  if (editLogoFile) {
+                    formData.append('logo', editLogoFile);
+                  }
+
+                  await axiosInstance.patch(`/api/users/clients/${editingClient.id}`, formData, {
+                    headers: {
+                      'Content-Type': 'multipart/form-data',
+                    },
+                  });
                   fetchClients(); // refresh
                   setEditModalOpen(false);
+                  setEditLogoPreview(null);
+                  setEditLogoFile(null);
+                  setEditLogoError(null);
                 }
               } catch (err) {
                 console.error("Failed to update client", err);
               }
             }}
+            disabled={!!editLogoError}
           >
             Save
           </Button>

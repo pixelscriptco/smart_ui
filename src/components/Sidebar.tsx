@@ -67,6 +67,7 @@ const Sidebar: React.FC = () => {
   const openProjects = () => {
     if (isProjectPage) {
       // If already on project page, just toggle the submenu
+      navigate('/projects');
       setProjectsOpen(!projectsOpen);
     } else {
       // If not on project page, navigate to projects and open submenu

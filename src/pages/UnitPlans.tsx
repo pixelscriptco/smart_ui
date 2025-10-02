@@ -50,7 +50,7 @@ const UnitPlans = () => {
       setError('');
       try {
         // Adjust the URL as needed for your backend route
-        const response = await axiosInstance.get('/api/units/unitplans');
+        const response = await axiosInstance.get(`/api/units/unitplans/${project_id}`);
         setUnitPlans(response.data.data || response.data.plans || []);
       } catch (err) {
         setError('Failed to fetch unit plans');
@@ -128,12 +128,12 @@ const UnitPlans = () => {
       });
 
       // Refresh the unit plans after successful upload
-      const response = await axiosInstance.get('/api/units/unitplans');
+      const response = await axiosInstance.get(`/api/units/unitplans/${project_id}`);
       setUnitPlans(response.data.data || response.data.plans || []);
       
       handleClose3dImageDialog();
     } catch (err) {
-      setError('Failed to upload 3D image');
+      setError('Failed to upload image');
     } finally {
       setUploading(false);
     }
@@ -176,8 +176,8 @@ const UnitPlans = () => {
                 <TableCell>Cost</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Show Plan</TableCell>
-                <TableCell>3D Images</TableCell>
-                <TableCell>Add 3D Image</TableCell>
+                <TableCell>Images</TableCell>
+                <TableCell>Add Normal Image</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -206,7 +206,7 @@ const UnitPlans = () => {
                     {plan.balcony_images && plan.balcony_images.length > 0 ? (
                       <Box>
                         {plan.balcony_images
-                          .filter(balcony => balcony.image_url && balcony.image_type === '3d')
+                          .filter(balcony => balcony.image_url && balcony.image_type === 'normal')
                           .map((balcony) => (
                             <Button
                               key={balcony.id}
@@ -218,8 +218,8 @@ const UnitPlans = () => {
                               {balcony.name}
                             </Button>
                           ))}
-                        {plan.balcony_images.filter(balcony => balcony.image_url && balcony.image_type === '3d').length === 0 && (
-                          <Typography variant="body2" color="text.secondary">No 3D Images</Typography>
+                        {plan.balcony_images.filter(balcony => balcony.image_url && balcony.image_type === 'normal').length === 0 && (
+                          <Typography variant="body2" color="text.secondary">No Images</Typography>
                         )}
                       </Box>
                     ) : (
@@ -233,7 +233,7 @@ const UnitPlans = () => {
                       color="primary"
                       onClick={() => add3dImageModal(plan.id!)} 
                     >
-                      Add 3D Image
+                      Add Image
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -259,7 +259,7 @@ const UnitPlans = () => {
       {/* 3D Image Upload Modal */}
       <Dialog open={open3dImageDialog} onClose={handleClose3dImageDialog} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          Add 3D Image - {selectedPlan?.name}
+          Add Image - {selectedPlan?.name}
           <IconButton onClick={handleClose3dImageDialog}>
             <CloseIcon />
           </IconButton>
@@ -276,7 +276,7 @@ const UnitPlans = () => {
                 </Typography> */}
                 
                 <Typography variant="h6" sx={{ mb: 2 }}>
-                  Select Balcony for 3D Image:
+                  Select Balcony for Image:
                 </Typography>
                 
                 {selectedPlan.balcony_images && selectedPlan.balcony_images.length > 0 ? (
@@ -318,7 +318,7 @@ const UnitPlans = () => {
                 {selectedBalconyId && (
                   <>
                     <Typography variant="body1" sx={{ mb: 2 }}>
-                      Select a 3D image file to upload for the selected balcony.
+                      Select a image file to upload for the selected balcony.
                     </Typography>
                     <input
                       accept="image/*"
@@ -334,7 +334,7 @@ const UnitPlans = () => {
                         fullWidth
                         sx={{ mb: 2 }}
                       >
-                        Choose 3D Image File
+                        Choose Image File
                       </Button>
                     </label>
                     {imageFile && (
@@ -365,7 +365,7 @@ const UnitPlans = () => {
       {/* 3D Image Viewer Modal */}
       <Dialog open={open3dImageViewer} onClose={handleClose3dImageViewer} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          3D Image - {selected3dImageName}
+           Image - {selected3dImageName}
           <IconButton onClick={handleClose3dImageViewer}>
             <CloseIcon />
           </IconButton>

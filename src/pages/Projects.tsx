@@ -35,20 +35,21 @@ import {
   FormControlLabel,
   Grid
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon, Search as SearchIcon,ContentCopy as ContentCopyIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon, Search as SearchIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
 import RoomIcon from '@mui/icons-material/Room';
 import axiosInstance from '../utils/axios';
 import LexicalEditor from '../components/LexicalEditor';
-import {MapPicker} from '../components/MapPicker';
+import { MapPicker } from '../components/MapPicker';
 interface User {
   company: string;
-  url:string
+  url: string
 }
 interface Project {
   id: number;
   user_id: number;
   name: string;
   description: string;
+  website_link: string;
   logo: string;
   url: string;
   project_url: string;
@@ -58,6 +59,7 @@ interface Project {
   created_at: string;
   updated_at: string;
   location?: string;
+  location_logo?: string;
 }
 
 interface Company {
@@ -68,6 +70,7 @@ interface Company {
 interface ProjectFormData {
   name: string;
   description: string;
+  website_link: string;
   project_url: string;
   status: number;
   logo: File | null;
@@ -78,6 +81,7 @@ interface ProjectFormData {
   location_title?: string;
   location_description?: string;
   location_image?: File | null;
+  location_logo?: File | null;
 }
 
 const Projects: React.FC = () => {
@@ -89,6 +93,7 @@ const Projects: React.FC = () => {
   const [formData, setFormData] = useState<ProjectFormData>({
     name: '',
     description: '',
+    website_link: '',
     project_url: '',
     status: 1,
     logo: null,
@@ -98,16 +103,19 @@ const Projects: React.FC = () => {
     location: '',
     location_title: '',
     location_description: '',
-    location_image: null
+    location_image: null,
+    location_logo:null
   });
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [qrCodePreview, setQrCodePreview] = useState<string | null>(null);
   const [locationImagePreview, setLocationImagePreview] = useState<string | null>(null);
+  const [locationLogoPreview, setLocationLogoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<number | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
@@ -117,20 +125,31 @@ const Projects: React.FC = () => {
     paragraph: 'editor-paragraph',
   };
 
-  
+
   useEffect(() => {
     fetchProjects();
     fetchCompanies();
   }, []);
 
   useEffect(() => {
-    const filtered = projects.filter(project => 
+    const filtered = projects.filter(project =>
       project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       project.User.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (project.location && project.location.toLowerCase().includes(searchTerm.toLowerCase()))
     );
     setFilteredProjects(filtered);
   }, [projects, searchTerm]);
+
+  // Clear coordinates validation error when coordinates are selected
+  useEffect(() => {
+    if (coordinates && validationErrors.coordinates) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.coordinates;
+        return newErrors;
+      });
+    }
+  }, [coordinates, validationErrors.coordinates]);
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -160,10 +179,11 @@ const Projects: React.FC = () => {
     if (project) {
       setIsEditing(true);
       setCurrentProjectId(project.id);
-      
+
       setFormData({
         name: project.name,
         description: project.description,
+        website_link: project.website_link,
         project_url: project.project_url,
         status: project.status,
         logo: null,
@@ -173,18 +193,21 @@ const Projects: React.FC = () => {
         location: (project as any).location || '',
         location_title: (project as any).location_title || '',
         location_description: (project as any).location_description || '',
-        location_image: null
+        location_image: null,
+        location_logo:null
       });
       setLogoPreview(project.logo || null);
       setQrCodePreview((project as any).qr_code || null);
       setLocationImagePreview((project as any).location_image || null);
+      setLocationLogoPreview((project as any).location_logo || null);
     } else {
       setIsEditing(false);
       setCurrentProjectId(null);
       setFormData({
         name: '',
         description: '',
-        project_url:'',
+        website_link: '',
+        project_url: '',
         status: 1,
         logo: null,
         company_id: 0,
@@ -193,22 +216,94 @@ const Projects: React.FC = () => {
         location: '',
         location_title: '',
         location_description: '',
-        location_image: null
+        location_image: null,
+        location_logo:null
       });
       setLogoPreview(null);
       setQrCodePreview(null);
       setLocationImagePreview(null);
+      setLocationLogoPreview(null);
     }
     setOpen(true);
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Required field validations
+    if (!formData.company_id || formData.company_id === 0) {
+      errors.company_id = 'Company is required';
+    }
+
+    if (!formData.name.trim()) {
+      errors.name = 'Project name is required';
+    } else if (formData.name.trim().length < 2) {
+      errors.name = 'Project name must be at least 2 characters long';
+    }
+
+    if (!formData.description.trim()) {
+      errors.description = 'Project description is required';
+    }
+
+    if (!formData.location_title?.trim()) {
+      errors.location_title = 'Location title is required';
+    }
+
+    if (!formData.location?.trim()) {
+      errors.location = 'Location is required';
+    }
+
+    if (!logoPreview && !isEditing) {
+      errors.logo = 'Logo is required';
+    }
+
+    if (!qrCodePreview && !isEditing) {
+      errors.qr_code = 'QR Code is required';
+    }
+
+    if (!locationImagePreview && !isEditing) {
+      errors.location_image = 'required';
+    }
+
+    if (!locationLogoPreview && !isEditing) {
+      errors.location_logo = 'required';
+    }
+
+    if (!coordinates) {
+      errors.coordinates = 'Please select a location on the map';
+    }
+
+    // URL validations
+    if (formData.project_url && !isValidUrl(formData.project_url)) {
+      errors.project_url = 'Please enter a valid VR URL';
+    }
+
+    if (formData.website_link && !isValidUrl(formData.website_link)) {
+      errors.website_link = 'Please enter a valid website URL';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const isValidUrl = (url: string): boolean => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const handleCloseModal = () => {
     setOpen(false);
     setSubmitError(null);
+    setValidationErrors({});
     setFormData({
       name: '',
       description: '',
-      project_url:'',
+      website_link: '',
+      project_url: '',
       status: 1,
       logo: null,
       company_id: 0,
@@ -217,17 +312,19 @@ const Projects: React.FC = () => {
       location: '',
       location_title: '',
       location_description: '',
-      location_image: null
+      location_image: null,
+      location_logo:null
     });
     setLogoPreview(null);
     setQrCodePreview(null);
     setLocationImagePreview(null);
+    setLocationLogoPreview(null);
     setIsEditing(false);
     setCurrentProjectId(null);
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | 
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> |
     { target: { name: string; value: number | string } }
   ) => {
     const { name, value } = e.target;
@@ -236,6 +333,15 @@ const Projects: React.FC = () => {
       ...prev,
       [name]: value
     }));
+
+    // Clear validation error for this field when user starts typing
+    if (validationErrors[name]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,6 +354,12 @@ const Projects: React.FC = () => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setLogoPreview(reader.result as string);
+        // Clear logo validation error when logo is successfully selected
+        setValidationErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.logo;
+          return newErrors;
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -256,13 +368,38 @@ const Projects: React.FC = () => {
   const handleQrCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData(prev => ({
-        ...prev,
-        qr_code: file
-      }));
       const reader = new FileReader();
       reader.onloadend = () => {
-        setQrCodePreview(reader.result as string);
+        const img = new window.Image();
+        img.onload = () => {
+          if (img.width === 260 && img.height === 60) {
+            setFormData(prev => ({
+              ...prev,
+              qr_code: file
+            }));
+            setQrCodePreview(reader.result as string);
+            // Clear QR code validation error when QR code is successfully selected
+            setValidationErrors(prev => {
+              const newErrors = { ...prev };
+              delete newErrors.qr_code;
+              return newErrors;
+            });
+          } else {
+            setValidationErrors(prev => ({
+              ...prev,
+              qr_code: 'QR code size : 260*60'
+            }));
+            setQrCodePreview(null);
+          }
+        };
+        img.onerror = () => {
+          setValidationErrors(prev => ({
+            ...prev,
+            qr_code: 'Invalid image file'
+          }));
+          setQrCodePreview(null);
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -271,13 +408,78 @@ const Projects: React.FC = () => {
   const handleLocationImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData(prev => ({
-        ...prev,
-        location_image: file
-      }));
       const reader = new FileReader();
       reader.onloadend = () => {
-        setLocationImagePreview(reader.result as string);
+        const img = new window.Image();
+        img.onload = () => {
+          if (img.width === 320 && img.height === 150) {
+            setFormData(prev => ({
+              ...prev,
+              location_image: file
+            }));
+            setLocationImagePreview(reader.result as string);
+            // Clear location logo validation error when logo is successfully selected
+            setValidationErrors(prev => {
+              const newErrors = { ...prev };
+              delete newErrors.location_image;
+              return newErrors;
+            });
+          } else {
+            setValidationErrors(prev => ({
+              ...prev,
+              location_image: 'logo size : 320*150'
+            }));
+            setLocationImagePreview(null);
+          }
+        };
+        img.onerror = () => {
+          setValidationErrors(prev => ({
+            ...prev,
+            location_image: 'Invalid image file'
+          }));
+          setLocationImagePreview(null);
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLocationLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const img = new window.Image();
+        img.onload = () => {
+          if (img.width === 50 && img.height === 50) {
+            setFormData(prev => ({
+              ...prev,
+              location_logo: file
+            }));
+            setLocationLogoPreview(reader.result as string);
+            // Clear location logo validation error when logo is successfully selected
+            setValidationErrors(prev => {
+              const newErrors = { ...prev };
+              delete newErrors.location_logo;
+              return newErrors;
+            });
+          } else {
+            setValidationErrors(prev => ({
+              ...prev,
+              location_logo: 'logo size : 50x50'
+            }));
+            setLocationLogoPreview(null);
+          }
+        };
+        img.onerror = () => {
+          setValidationErrors(prev => ({
+            ...prev,
+            location_logo: 'Invalid image file'
+          }));
+          setLocationLogoPreview(null);
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -286,12 +488,19 @@ const Projects: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
+    setValidationErrors({});
+
+    if (!validateForm()) {
+      return;
+    }
+
     setLoading(true);
     console.log(coordinates);
-    
+
     const formDataToSend = new FormData();
     formDataToSend.append('name', formData.name);
     formDataToSend.append('description', formData.description);
+    formDataToSend.append('website_link', formData.website_link);
     formDataToSend.append('project_url', formData.project_url);
     formDataToSend.append('status', formData.status === 1 ? '1' : '0');
     formDataToSend.append('company_id', formData.company_id.toString());
@@ -320,6 +529,9 @@ const Projects: React.FC = () => {
     }
     if (formData.location_image) {
       formDataToSend.append('location_image', formData.location_image);
+    }
+    if (formData.location_logo) {
+      formDataToSend.append('location_logo', formData.location_logo);
     }
 
     try {
@@ -398,23 +610,23 @@ const Projects: React.FC = () => {
 
   return (
     <Fade in timeout={500}>
-      <Box sx={{ 
+      <Box sx={{
         p: { xs: 2, md: 4 },
         maxWidth: '1400px',
         margin: '0 auto'
       }}>
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
           mb: 4,
           flexDirection: { xs: 'column', sm: 'row' },
           gap: 2
         }}>
-          <Typography 
-            variant="h4" 
+          <Typography
+            variant="h4"
             component="h1"
-            sx={{ 
+            sx={{
               fontWeight: 500,
               color: theme.palette.text.primary,
               letterSpacing: '-0.5px'
@@ -467,10 +679,10 @@ const Projects: React.FC = () => {
         {loading && <CircularProgress sx={{ mt: 4 }} />}
         {error && <Alert severity="error" sx={{ mt: 4 }}>{error}</Alert>}
 
-        <TableContainer 
-          component={Paper} 
+        <TableContainer
+          component={Paper}
           elevation={0}
-          sx={{ 
+          sx={{
             borderRadius: 2,
             border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             overflow: 'hidden'
@@ -502,7 +714,7 @@ const Projects: React.FC = () => {
                 filteredProjects
                   .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((project) => (
-                    <TableRow key={project.id}  style={{ cursor: 'pointer'}}>
+                    <TableRow key={project.id} style={{ cursor: 'pointer' }}>
                       <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{project.name}</TableCell>
                       <TableCell onClick={() => navigate(`/projects/${project.id}`)}>
                         <Avatar
@@ -532,7 +744,7 @@ const Projects: React.FC = () => {
                               color="success"
                             />
                           }
-                          label={project.status === 1 ? 'active':'inactive'}
+                          label={project.status === 1 ? 'active' : 'inactive'}
                           sx={{
                             '& .MuiFormControlLabel-label': {
                               color: project.status === 1 ? 'success.main' : 'error.main',
@@ -544,8 +756,8 @@ const Projects: React.FC = () => {
                       <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{new Date(project.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
                         <Tooltip title="Edit">
-                          <IconButton 
-                            color="primary" 
+                          <IconButton
+                            color="primary"
                             size="small"
                             onClick={() => handleOpenModal(project)}
                           >
@@ -553,10 +765,10 @@ const Projects: React.FC = () => {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Copy Project URL">
-                          <IconButton 
-                            color="primary" 
+                          <IconButton
+                            color="primary"
                             size="small"
-                            onClick={() => navigator.clipboard.writeText(project.User.url+'/'+project.url)}
+                            onClick={() => navigator.clipboard.writeText(project.User.url + '/' + project.url)}
                           >
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
@@ -587,10 +799,10 @@ const Projects: React.FC = () => {
           />
         </TableContainer>
 
-        <Dialog 
-          open={open} 
+        <Dialog
+          open={open}
           onClose={handleCloseModal}
-          maxWidth="sm" 
+          maxWidth="sm"
           fullWidth
         >
           <DialogTitle>
@@ -653,6 +865,11 @@ const Projects: React.FC = () => {
                 <Typography variant="body2" color="text.secondary" align="center">
                   Logo*
                 </Typography>
+                {validationErrors.logo && (
+                  <Typography variant="caption" color="error" align="center" sx={{ mt: 1 }}>
+                    {validationErrors.logo}
+                  </Typography>
+                )}
               </Box>
               {/* QR Code upload */}
               <Box
@@ -706,19 +923,15 @@ const Projects: React.FC = () => {
                   style={{ display: 'none' }}
                 />
                 <Typography variant="body2" color="text.secondary" align="center">
-                  QR Code
+                  QR Code*
                 </Typography>
+                {validationErrors.qr_code && (
+                  <Typography variant="caption" color="error" align="center" sx={{ mt: 1 }}>
+                    {validationErrors.qr_code}
+                  </Typography>
+                )}
               </Box>
             </Box>
-            {/* Registration Number */}
-            {/* <TextField
-              fullWidth
-              label="Registration Number"
-              name="registration_number"
-              value={formData.registration_number}
-              onChange={handleInputChange}
-              sx={{ mb: 2 }}
-            /> */}
             <Box sx={{
               display: 'flex',
               flexDirection: 'column',
@@ -728,8 +941,8 @@ const Projects: React.FC = () => {
                 <Typography variant="body2" color="error">{submitError}</Typography>
               )}
 
-              <FormControl fullWidth>
-                <InputLabel>Company</InputLabel>
+              <FormControl fullWidth error={!!validationErrors.company_id}>
+                <InputLabel>Company*</InputLabel>
                 <Select
                   name="company_id"
                   value={formData.company_id}
@@ -743,6 +956,11 @@ const Projects: React.FC = () => {
                     </MenuItem>
                   ))}
                 </Select>
+                {validationErrors.company_id && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, ml: 2 }}>
+                    {validationErrors.company_id}
+                  </Typography>
+                )}
               </FormControl>
 
               <TextField
@@ -752,6 +970,8 @@ const Projects: React.FC = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 required
+                error={!!validationErrors.name}
+                helperText={validationErrors.name}
               />
               <TextField
                 fullWidth
@@ -759,11 +979,41 @@ const Projects: React.FC = () => {
                 name="project_url"
                 value={formData.project_url}
                 onChange={handleInputChange}
+                error={!!validationErrors.project_url}
+                helperText={validationErrors.project_url}
               />
-              <LexicalEditor 
-                initialValue={formData.description} 
-                onChange={(html) => setFormData(prev => ({ ...prev, description: html }))} 
+              <Box>
+                <LexicalEditor
+                  initialValue={formData.description}
+                  onChange={(html) => {
+                    setFormData(prev => ({ ...prev, description: html }));
+                    // Clear description validation error when user starts typing
+                    if (validationErrors.description) {
+                      setValidationErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.description;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                />
+                {validationErrors.description && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, ml: 2 }}>
+                    {validationErrors.description}
+                  </Typography>
+                )}
+              </Box>
+              <TextField
+                fullWidth
+                label="Website Link"
+                name="website_link"
+                value={formData.website_link}
+                onChange={handleInputChange}
+                error={!!validationErrors.website_link}
+                helperText={validationErrors.website_link}
               />
+              <h3>Location Details</h3>
+
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box component="label" htmlFor="location-image-upload" sx={{ cursor: 'pointer' }}>
                   <Avatar
@@ -780,17 +1030,47 @@ const Projects: React.FC = () => {
                     style={{ display: 'none' }}
                   />
                   <Typography variant="body2" color="text.secondary" align="center">
-                    Image
+                    Image*
                   </Typography>
+                  {validationErrors.location_image && (
+                    <Typography variant="caption" color="error" align="center" sx={{ mt: 1 }}>
+                      {validationErrors.location_image}
+                    </Typography>
+                  )}
                 </Box>
-                <TextField
+                <Box component="label" htmlFor="location-logo-upload" sx={{ cursor: 'pointer' }}>
+                  <Avatar
+                    src={locationLogoPreview || undefined}
+                    sx={{ width: 64, height: 64 }}
+                  >
+                    {!locationLogoPreview && <UploadIcon />}
+                  </Avatar>
+                  <input
+                    id="location-logo-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLocationLogoChange}
+                    style={{ display: 'none' }}
+                  />
+                  <Typography variant="body2" color="text.secondary" align="center">
+                    Logo*
+                  </Typography>
+                  {validationErrors.location_logo && (
+                    <Typography variant="caption" color="error" align="center" sx={{ mt: 1 }}>
+                      {validationErrors.location_logo}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+              <TextField
                   fullWidth
-                  label="Location Title"
+                  label="Location Title*"
                   name="location_title"
                   value={formData.location_title}
                   onChange={handleInputChange}
+                  error={!!validationErrors.location_title}
+                  helperText={validationErrors.location_title}
                 />
-              </Box>
               <TextField
                 fullWidth
                 multiline
@@ -799,20 +1079,27 @@ const Projects: React.FC = () => {
                 name="location_description"
                 value={formData.location_description}
                 onChange={handleInputChange}
+                error={!!validationErrors.location}
+                helperText={validationErrors.location}
               />
               <MapPicker
                 coordinates={coordinates}
                 setCoordinates={setCoordinates}
                 setFormData={setFormData}
               />
+              {validationErrors.coordinates && (
+                <Typography variant="caption" color="error" sx={{ mt: 1, ml: 2 }}>
+                  {validationErrors.coordinates}
+                </Typography>
+              )}
 
             </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseModal}>Cancel</Button>
-            <Button 
-              onClick={handleSubmit} 
-              variant="contained" 
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
               disabled={loading}
             >
               {isEditing ? 'Save Changes' : 'Create Project'}

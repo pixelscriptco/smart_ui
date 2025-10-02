@@ -648,7 +648,7 @@ const InteractiveImageUploader = () => {
                   onChange={e => setBalconyImageType(e.target.value)}
                   sx={{ mb: 2, borderRadius: 2 }}
                 >
-                  <MenuItem value="3d">3D</MenuItem>
+                  {/* <MenuItem value="3d">3D</MenuItem> */}
                   <MenuItem value="normal">Normal</MenuItem>
                 </Select>
               </FormControl>

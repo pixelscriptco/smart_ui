@@ -60,6 +60,9 @@ interface Project {
   updated_at: string;
   location?: string;
   location_logo?: string;
+  coordinates?: string;
+  latitude?: string;
+  longitude?: string;
 }
 
 interface Company {
@@ -196,6 +199,45 @@ const Projects: React.FC = () => {
         location_image: null,
         location_logo:null
       });
+
+      // Set existing coordinates if available
+      console.log('Project data for coordinates:', project);
+      
+      let coordinateObj = null;
+      
+      // Check for coordinates field (JSON format)
+      if ((project as any).coordinates) {
+        try {
+          const coords = JSON.parse((project as any).coordinates);
+          if (coords.lat && coords.lng) {
+            coordinateObj = { lat: coords.lat, lng: coords.lng };
+            console.log('Found coordinates from coordinates field:', coordinateObj);
+          }
+        } catch (error) {
+          console.error('Error parsing coordinates field:', error);
+        }
+      }
+      
+      // Check for separate latitude/longitude fields
+      if (!coordinateObj && (project as any).latitude && (project as any).longitude) {
+        try {
+          const lat = parseFloat((project as any).latitude);
+          const lng = parseFloat((project as any).longitude);
+          if (!isNaN(lat) && !isNaN(lng)) {
+            coordinateObj = { lat, lng };
+            console.log('Found coordinates from lat/lng fields:', coordinateObj);
+          }
+        } catch (error) {
+          console.error('Error parsing lat/lng fields:', error);
+        }
+      }
+      
+      if (coordinateObj) {
+        setCoordinates(coordinateObj);
+      } else {
+        console.log('No valid coordinates found in project');
+        setCoordinates(null);
+      }
       setLogoPreview(project.logo || null);
       setQrCodePreview((project as any).qr_code || null);
       setLocationImagePreview((project as any).location_image || null);
@@ -219,6 +261,7 @@ const Projects: React.FC = () => {
         location_image: null,
         location_logo:null
       });
+      setCoordinates(null);
       setLogoPreview(null);
       setQrCodePreview(null);
       setLocationImagePreview(null);
@@ -271,6 +314,8 @@ const Projects: React.FC = () => {
 
     if (!coordinates) {
       errors.coordinates = 'Please select a location on the map';
+    } else {
+      console.log('Coordinates validation passed:', coordinates);
     }
 
     // URL validations
@@ -372,7 +417,7 @@ const Projects: React.FC = () => {
       reader.onloadend = () => {
         const img = new window.Image();
         img.onload = () => {
-          if (img.width === 260 && img.height === 60) {
+          if (img.width === 200 && img.height === 60) {
             setFormData(prev => ({
               ...prev,
               qr_code: file
@@ -387,7 +432,7 @@ const Projects: React.FC = () => {
           } else {
             setValidationErrors(prev => ({
               ...prev,
-              qr_code: 'QR code size : 260*60'
+              qr_code: 'QR code size : 200*60'
             }));
             setQrCodePreview(null);
           }
@@ -863,7 +908,7 @@ const Projects: React.FC = () => {
                   style={{ display: 'none' }}
                 />
                 <Typography variant="body2" color="text.secondary" align="center">
-                  Logo*
+                  Project Logo*
                 </Typography>
                 {validationErrors.logo && (
                   <Typography variant="caption" color="error" align="center" sx={{ mt: 1 }}>
@@ -923,7 +968,7 @@ const Projects: React.FC = () => {
                   style={{ display: 'none' }}
                 />
                 <Typography variant="body2" color="text.secondary" align="center">
-                  QR Code*
+                  RERA*
                 </Typography>
                 {validationErrors.qr_code && (
                   <Typography variant="caption" color="error" align="center" sx={{ mt: 1 }}>
@@ -975,7 +1020,7 @@ const Projects: React.FC = () => {
               />
               <TextField
                 fullWidth
-                label="VR URL"
+                label="360 WT URL"
                 name="project_url"
                 value={formData.project_url}
                 onChange={handleInputChange}
@@ -1005,14 +1050,14 @@ const Projects: React.FC = () => {
               </Box>
               <TextField
                 fullWidth
-                label="Website Link"
+                label="Builder/Project URL"
                 name="website_link"
                 value={formData.website_link}
                 onChange={handleInputChange}
                 error={!!validationErrors.website_link}
                 helperText={validationErrors.website_link}
               />
-              <h3>Location Details</h3>
+              <h3>Project Details - Map Page</h3>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box component="label" htmlFor="location-image-upload" sx={{ cursor: 'pointer' }}>
@@ -1030,7 +1075,7 @@ const Projects: React.FC = () => {
                     style={{ display: 'none' }}
                   />
                   <Typography variant="body2" color="text.secondary" align="center">
-                    Image*
+                    Thumbnail*
                   </Typography>
                   {validationErrors.location_image && (
                     <Typography variant="caption" color="error" align="center" sx={{ mt: 1 }}>
@@ -1064,7 +1109,7 @@ const Projects: React.FC = () => {
               </Box>
               <TextField
                   fullWidth
-                  label="Location Title*"
+                  label="Project Title*"
                   name="location_title"
                   value={formData.location_title}
                   onChange={handleInputChange}
@@ -1075,7 +1120,7 @@ const Projects: React.FC = () => {
                 fullWidth
                 multiline
                 minRows={2}
-                label="Location Description"
+                label="Project Description"
                 name="location_description"
                 value={formData.location_description}
                 onChange={handleInputChange}

@@ -277,12 +277,12 @@ const Floors: React.FC = () => {
       <Paper sx={{ p: 3, mb: 3 }}>
       <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, mb: 3 }}>
         <FormControl sx={{ minWidth: 400 }}>
-          <InputLabel id="building-select-label">Select Building</InputLabel>
+          <InputLabel id="building-select-label">Select Project</InputLabel>
           <Select
             labelId="building-select-label"
             value={selectedBuilding}
             onChange={handleBuildingChange}
-            label="Select Building"
+            label="Select Project"
           >
             {buildings.map((building) => (
               <MenuItem key={building.id} value={building.id}>

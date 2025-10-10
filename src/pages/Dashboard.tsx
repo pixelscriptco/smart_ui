@@ -236,7 +236,7 @@ const Dashboard: React.FC = () => {
               icon={<PeopleIcon />}
               color={theme.palette.primary.main}
               loading={refreshing}
-              onClick={() => navigate('/clients')}
+              onClick={() => navigate('/builder')}
             />
             <StatCard
               title="Active Customers"
@@ -244,7 +244,7 @@ const Dashboard: React.FC = () => {
               icon={<TrendingUpIcon />}
               color={theme.palette.success.main}
               loading={refreshing}
-              onClick={() => navigate('/clients')}
+              onClick={() => navigate('/builder')}
             />
             <StatCard
               title="Total Projects"

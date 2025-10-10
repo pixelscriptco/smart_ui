@@ -147,7 +147,8 @@ const Clients = () => {
 
   const filteredClients = clients.filter(client => {
     const matchesSearch = client.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-                         client.email.toLowerCase().includes(filters.search.toLowerCase());
+                         client.email.toLowerCase().includes(filters.search.toLowerCase()) || 
+                         client.company.toLowerCase().includes(filters.search.toLowerCase());
     const matchesStatus = filters.status === 'all' || client.status === filters.status;
     
     return matchesSearch && matchesStatus;
@@ -569,7 +570,7 @@ const Clients = () => {
                     alt="Logo preview"
                     style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4 }}
                   />
-                  <Button
+                  {/* <Button
                     size="small"
                     color="error"
                     onClick={() => {
@@ -579,7 +580,7 @@ const Clients = () => {
                     }}
                   >
                     Remove
-                  </Button>
+                  </Button> */}
                 </Box>
               )}
             </Box>
@@ -728,7 +729,7 @@ const Clients = () => {
                         alt="Logo preview"
                         style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4 }}
                       />
-                      <Button
+                      {/* <Button
                         size="small"
                         color="error"
                         onClick={() => {
@@ -738,7 +739,7 @@ const Clients = () => {
                         }}
                       >
                         Remove
-                      </Button>
+                      </Button> */}
                     </Box>
                   )}
                 </Box>
@@ -778,8 +779,8 @@ const Clients = () => {
                   formData.append('name', editingClient.name);
                   formData.append('mobile', editingClient.mobile);
                   formData.append('company', editingClient.company);
-                  formData.append('status', editingClient.status);
                   formData.append('description', editingClient.description || '');
+                  formData.append('status', editingClient.status);
                   
                   if (editLogoFile) {
                     formData.append('logo', editLogoFile);

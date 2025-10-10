@@ -40,7 +40,7 @@ const Sidebar: React.FC = () => {
   const navItems = [
     { label: 'Dashboard', to: '/', icon: <DashboardIcon /> },
     { label: 'Projects', to: '/projects', icon: <RoomIcon /> },
-    { label: 'Clients', to: '/clients', icon: <GroupIcon /> },
+    { label: 'Builder', to: '/builder', icon: <GroupIcon /> },
     { label: 'Enquiries', to: '/enquiries', icon: <ContactMailIcon /> },
     { label: 'Settings', to: '/settings', icon: <DeviceIcon /> },
   ];

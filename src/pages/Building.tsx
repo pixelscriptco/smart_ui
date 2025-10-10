@@ -40,6 +40,7 @@ const InteractiveImageUploader = () => {
   const { project_id } = useParams();
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [pendingPolygon, setPendingPolygon] = useState<Point[]>([]);
+  const [projectName, setProjectName] = useState('');
 
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,6 +93,10 @@ const InteractiveImageUploader = () => {
       
       try {
         const response = await axiosInstance.get(`/api/buildings/${project_id}`);
+        
+        // Set project name regardless of whether building exists
+        setProjectName(response.data.project);
+        
         if(response.data.buildings.length === 0) {
           setIsExistingBuilding(false);
           return;
@@ -99,7 +104,6 @@ const InteractiveImageUploader = () => {
         const { name, image_url, svg_url } = response.data.buildings[0];
 
         setBuildingName(name);
-
         // Load image
         const imageResp = await fetch(image_url);        
         const imageBlob = await imageResp.blob();
@@ -520,7 +524,7 @@ const InteractiveImageUploader = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 60}}>
         <Typography variant="h4">
-          Manage Project Details
+          Manage Project {projectName}
         </Typography>
         <Button
           // variant="outlined"

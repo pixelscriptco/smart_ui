@@ -240,7 +240,7 @@ const AppRoutes = () => {
             }
           />
           <Route
-            path="/clients"
+            path="/builder"
             element={
               isAuthenticated ? (
                 <Clients />

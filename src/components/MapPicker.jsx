@@ -46,9 +46,20 @@ function MapPicker({ coordinates, setCoordinates, setFormData }) {
     loadGoogleMapsScript();
   }, []);
 
+  // Handle coordinate changes
+  useEffect(() => {
+    if (coordinates && mapRef.current && markerRef.current) {
+      console.log('Updating marker position to:', coordinates);
+      markerRef.current.setPosition(coordinates);
+      mapRef.current.setCenter(coordinates);
+    }
+  }, [coordinates]);
+
   // Initialize map when Google Maps is loaded
   useEffect(() => {
     if (!isMapLoaded || !window.google) return;
+
+    console.log('MapPicker received coordinates:', coordinates);
 
     // Initialize Autocomplete Service
     autocompleteService.current = new window.google.maps.places.AutocompleteService();

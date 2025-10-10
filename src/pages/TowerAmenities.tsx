@@ -107,10 +107,10 @@ const TowerAmenities = () => {
       setError('Amenity name is required');
       return;
     }
-    if (!newAmenity.vr_url.trim()) {
-      setError('VR URL is required');
-      return;
-    }
+    // if (!newAmenity.vr_url.trim()) {
+    //   setError('VR URL is required');
+    //   return;
+    // }
     if (!isEditing && !newAmenity.image) {
       setError('Image is required');
       return;
@@ -407,7 +407,7 @@ const TowerAmenities = () => {
           <Button
             variant="contained"
             onClick={handleAddAmenity}
-            disabled={uploading || !newAmenity.name.trim() || !newAmenity.vr_url.trim() || (!isEditing && !newAmenity.image)}
+            disabled={uploading || !newAmenity.name.trim() || (!newAmenity.vr_url.trim() && (!isEditing ? !newAmenity.image : false))}
             startIcon={uploading ? <CircularProgress size={20} /> : null}
           >
             {uploading ? (isEditing ? 'Updating...' : 'Adding...') : (isEditing ? 'Update' : 'Add')} Amenity

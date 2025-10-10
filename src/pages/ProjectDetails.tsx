@@ -257,7 +257,7 @@ const ProjectDetails: React.FC = () => {
                   Floors
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Manage building floors
+                  Manage floors
                 </Typography>
               </CardContent>
             </CardActionArea>

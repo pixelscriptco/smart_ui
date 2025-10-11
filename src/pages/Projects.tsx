@@ -124,6 +124,8 @@ const Projects: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [urlWarningOpen, setUrlWarningOpen] = useState(false);
+  const [selectedProjectForUrl, setSelectedProjectForUrl] = useState<Project | null>(null);
   const editor_theme = {
     paragraph: 'editor-paragraph',
   };
@@ -175,6 +177,19 @@ const Projects: React.FC = () => {
     } catch (err) {
       console.error('Error fetching companies:', err);
     }
+  };
+
+  const handleCopyUrl = (project: Project) => {
+    // Check if User.url exists
+    if (!project.User?.url) {
+      setSelectedProjectForUrl(project);
+      setUrlWarningOpen(true);
+      return;
+    }
+    
+    // Copy URL to clipboard
+    const fullUrl = project.User.url + '/' + project.url;
+    navigator.clipboard.writeText(fullUrl);
   };
 
   const handleOpenModal = (project?: Project) => {
@@ -813,7 +828,7 @@ const Projects: React.FC = () => {
                           <IconButton
                             color="primary"
                             size="small"
-                            onClick={() => navigator.clipboard.writeText(project.User.url + '/' + project.url)}
+                            onClick={() => handleCopyUrl(project)}
                           >
                             <ContentCopyIcon fontSize="small" />
                           </IconButton>
@@ -1148,6 +1163,64 @@ const Projects: React.FC = () => {
               disabled={loading}
             >
               {isEditing ? 'Save Changes' : 'Create Project'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* URL Warning Modal */}
+        <Dialog
+          open={urlWarningOpen}
+          onClose={() => setUrlWarningOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            color: 'warning.main'
+          }}>
+            <Box
+              component="svg"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              sx={{ width: 28, height: 28 }}
+            >
+              <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </Box>
+            URL Not Available
+          </DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              The builder URL is not set for this project's client.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Please ask the builder to set their URL from the Clients page before copying the project URL.
+            </Typography>
+            {selectedProjectForUrl && (
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Project:</strong> {selectedProjectForUrl.name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  <strong>Builder:</strong> {selectedProjectForUrl.User?.company || 'N/A'}
+                </Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setUrlWarningOpen(false)}>
+              Close
+            </Button>
+            <Button 
+              variant="contained" 
+              onClick={() => {
+                setUrlWarningOpen(false);
+                navigate('/builder');
+              }}
+            >
+              Go to Clients
             </Button>
           </DialogActions>
         </Dialog>

@@ -75,6 +75,7 @@ const Units: React.FC = () => {
   const [customUnitName, setCustomUnitName] = useState('');
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [loadingAddPlanForSelected, setLoadingAddPlanForSelected] = useState(false);
+  const [projectName, setProjectName] = useState('');
   const navigate = useNavigate();
   const { project_id } = useParams();
 
@@ -83,6 +84,7 @@ const Units: React.FC = () => {
       try {
         const response = await axiosInstance.get(`/api/buildings/${project_id}`);
         setBuildings(response.data.buildings);
+        setProjectName(response.data.project);
       } catch (err) {
         console.error('Error fetching buildings:', err);
         setError('Failed to load buildings');
@@ -439,7 +441,7 @@ const Units: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h4">
-          Manage Units
+          Units ({projectName})
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
         <Button

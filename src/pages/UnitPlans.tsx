@@ -76,6 +76,8 @@ const UnitPlans = () => {
     setSelectedPlanId(planId);
     setSelectedPlan(plan || null);
     setSelectedBalconyId(null);
+    setError('');
+    setImageFile(null);
     setOpen3dImageDialog(true);
   };
 
@@ -85,6 +87,7 @@ const UnitPlans = () => {
     setSelectedPlan(null);
     setSelectedBalconyId(null);
     setImageFile(null);
+    setError('');
   };
 
   const handleBalconySelect = (balconyId: number) => {
@@ -112,9 +115,13 @@ const UnitPlans = () => {
   };
 
   const handleUpload3dImage = async () => {
-    if (!imageFile || !selectedPlanId || !selectedBalconyId) return;
+    if (!imageFile || !selectedPlanId || !selectedBalconyId) {
+      setError('Please select a balcony and choose an image file');
+      return;
+    }
 
     setUploading(true);
+    setError('');
     try {
       const formData = new FormData();
       formData.append('image', imageFile);
@@ -132,8 +139,10 @@ const UnitPlans = () => {
       setUnitPlans(response.data.data || response.data.plans || []);
       
       handleClose3dImageDialog();
-    } catch (err) {
-      setError('Failed to upload image');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to upload image. Please try again.';
+      setError(errorMessage);
+      console.error('Upload error:', err);
     } finally {
       setUploading(false);
     }
@@ -347,6 +356,11 @@ const UnitPlans = () => {
               </>
             )}
           </Box>
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose3dImageDialog} disabled={uploading}>

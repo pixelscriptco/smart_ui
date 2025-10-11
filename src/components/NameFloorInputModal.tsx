@@ -40,7 +40,7 @@ const NameFloorInputModal: React.FC<NameInputModalProps> = ({
         style={{ marginTop : 1 }}
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Area name"
+        placeholder="Order Number"
         className="modal-input"
       />
       <label htmlFor="Number of floors" style={{color:'White'}}>Number of floors</label>

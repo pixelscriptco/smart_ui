@@ -602,7 +602,7 @@ const InteractiveImageUploader = () => {
 
       <NameInputModal
         isOpen={isNameModalOpen}
-        title='Enter floor details'
+        title='Enter Apartment Order Number'
         onClose={() => {
           setIsNameModalOpen(false);
           setPendingPolygon([]);

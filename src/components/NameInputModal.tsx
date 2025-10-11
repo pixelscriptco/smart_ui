@@ -37,7 +37,7 @@ const NameInputModal: React.FC<NameInputModalProps> = ({
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Area name"
+        placeholder="Order Number"
         className="modal-input"
       />
     </Modal>

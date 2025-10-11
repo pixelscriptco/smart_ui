@@ -16,6 +16,7 @@ const Towers = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const [projectName, setProjectName] = useState('');
   const { project_id, building_id } = useParams();
 
   useEffect(() => {
@@ -23,6 +24,7 @@ const Towers = () => {
       try {
         const response = await axiosInstance.get(`/api/projects/${project_id}/towers`);
         setTowers(response.data.towers);
+        setProjectName(response.data.project);
       } catch (err) {
         console.error('Error fetching towers:', err);
         setError('Failed to load towers');
@@ -46,7 +48,7 @@ const Towers = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 60 }}>
         <Typography variant="h4">
-          Towers
+          Towers ({projectName})
         </Typography>
         <Button
           variant="contained"

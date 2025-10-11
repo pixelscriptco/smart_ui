@@ -57,6 +57,7 @@ const Floors: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [isEditingMode, setIsEditingMode] = useState(false);
+  const [projectName, setProjectName] = useState('');
   const navigate = useNavigate();
   const { project_id } = useParams();
 
@@ -65,6 +66,7 @@ const Floors: React.FC = () => {
       try {
         const response = await axiosInstance.get(`/api/buildings/${project_id}`);
         setBuildings(response.data.buildings);
+        setProjectName(response.data.project);
       } catch (err) {
         console.error('Error fetching buildings:', err);
         setError('Failed to load buildings');
@@ -247,7 +249,7 @@ const Floors: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h4">
-          Manage Floors
+          Floors ({projectName})
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button

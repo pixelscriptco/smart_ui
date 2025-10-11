@@ -148,6 +148,7 @@ const Clients = () => {
   const filteredClients = clients.filter(client => {
     const matchesSearch = client.name.toLowerCase().includes(filters.search.toLowerCase()) ||
                          client.email.toLowerCase().includes(filters.search.toLowerCase()) || 
+                         client.mobile.includes(filters.search.toLowerCase()) || 
                          client.company.toLowerCase().includes(filters.search.toLowerCase());
     const matchesStatus = filters.status === 'all' || client.status === filters.status;
     

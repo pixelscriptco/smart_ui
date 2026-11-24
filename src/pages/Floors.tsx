@@ -265,7 +265,7 @@ const Floors: React.FC = () => {
             startIcon={<AddIcon />}
             onClick={() => navigate(`/projects/${project_id}/floor-plan`)}
           >
-            Create Floor Plan
+            Create Typical Plan
           </Button>
           <Button
             variant="outlined"
@@ -399,16 +399,7 @@ const Floors: React.FC = () => {
                           Edit
                         </Button> */}
                       </>
-                    ) : (
-                      <Button
-                        variant="contained"
-                        startIcon={<AddIcon />}
-                        fullWidth
-                        onClick={() => handleAddFloorPlan}
-                      >
-                        Create Floor Plan
-                      </Button>
-                    )}
+                    ) : <></>}
                   </Box>
                 </Paper>
               ))}

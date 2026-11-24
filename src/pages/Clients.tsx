@@ -40,6 +40,8 @@ import axiosInstance from '../utils/axios';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import CheckIcon from '@mui/icons-material/Check';
 import LexicalEditor from '../components/LexicalEditor';
+import { replaceS3WithCloudFront, processApiResponse } from '../utils/urlReplacer';
+
 interface Client {
   id: number;
   name: string;
@@ -55,7 +57,7 @@ interface Client {
   description?: string;
 }
 
-const Clients = () => {
+const Clients: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +121,14 @@ const Clients = () => {
     try {
       setLoading(true);
       const response = await axiosInstance.get('/api/users/clients');
-      setClients(response.data);
+
+      // Process the response data to replace S3 URLs with CloudFront URLs
+      const processedData = processApiResponse(response.data) as any;      
+      const processedClients = (processedData || []).map((client: Client) => ({
+        ...client,
+        logo: replaceS3WithCloudFront(client.logo || '')
+      }));
+      setClients(processedClients);
     } catch (err) {
       setError('Failed to fetch clients');
       console.error('Error fetching clients:', err);
@@ -457,7 +466,7 @@ const Clients = () => {
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
         <Typography variant="h4" gutterBottom>
-          Clients
+          Builder
         </Typography>
         <Button
           variant="contained"
@@ -473,7 +482,7 @@ const Clients = () => {
             setLogoPreview(null);
           }}
         >
-          Create New Client
+          Create New Builder
         </Button>
       </Box>
 

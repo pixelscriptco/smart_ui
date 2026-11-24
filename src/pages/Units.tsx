@@ -631,7 +631,7 @@ const Units: React.FC = () => {
                       </FormControl>
                     </Box>
                     <Typography variant="h6" color="text.secondary" gutterBottom>
-                      {unit.slug??unit.name}
+                      {unit.slug?unit.slug:unit.name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       Unit {unit.name}

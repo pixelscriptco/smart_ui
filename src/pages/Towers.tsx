@@ -46,7 +46,7 @@ const Towers = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 60 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, justifyContent:'space-between' }}>
         <Typography variant="h4">
           Towers ({projectName})
         </Typography>

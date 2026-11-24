@@ -5,6 +5,7 @@ import axiosInstance from '../utils/axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SelectChangeEvent } from '@mui/material/Select';
 import TextField from '@mui/material/TextField';
+import { replaceS3WithCloudFront, processApiResponse } from '../utils/urlReplacer';
 
 type Point = {
   x: number;
@@ -90,8 +91,8 @@ const InteractiveImageUploader = () => {
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = ((e.clientX - rect.left) / rect.width) * 4000;
+    const y = ((e.clientY - rect.top) / rect.height) * 2250;
 
     // Double-click only starts drawing
     if (drawMode === 'line' && currentPolygon.length === 0) {
@@ -116,7 +117,10 @@ const InteractiveImageUploader = () => {
     
     try {
       const response = await axiosInstance.get(`/api/towers/${tower_id}?order=${orderParam}`);
-      const { name, floor_count, tower_plans } = response.data.tower;
+      
+      // Process the response data to replace S3 URLs with CloudFront URLs
+      const processedData = processApiResponse(response.data) as any;
+      const { name, floor_count, tower_plans } = processedData.tower || {};
 
       setTowerName(name);
       setFloorCount(floor_count);
@@ -128,14 +132,18 @@ const InteractiveImageUploader = () => {
         setOrderNumber(Number(order));
         setDirection(direction)
 
+        // Replace S3 URLs with CloudFront URLs
+        const cloudFrontImageUrl = replaceS3WithCloudFront(image_url);
+        const cloudFrontSvgUrl = replaceS3WithCloudFront(svg_url);
+
         // Load image
-        const imageResp = await fetch(image_url);        
+        const imageResp = await fetch(cloudFrontImageUrl);        
         const imageBlob = await imageResp.blob();
         const imageBase64 = await convertBlobToBase64(imageBlob);
         setImageSrc(imageBase64 as string);
 
         // Load SVG content
-        const svgResp = await fetch(svg_url);
+        const svgResp = await fetch(cloudFrontSvgUrl);
         const svgText = await svgResp.text();
         setSvgContent(svgText);
         setIsExistingTower(true); // Set to true for existing building
@@ -162,8 +170,8 @@ const InteractiveImageUploader = () => {
   const handleClick = (e: React.MouseEvent) => {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = ((e.clientX - rect.left) / rect.width) * 4000;
+    const y = ((e.clientY - rect.top) / rect.height) * 2250;
 
     // Check if clicking on a closed shape first
     const target = e.target as SVGElement;
@@ -192,7 +200,7 @@ const InteractiveImageUploader = () => {
         Math.pow(x - startPoint.x, 2) + Math.pow(y - startPoint.y, 2)
       );
 
-      if (distance < 20 && currentPolygon.length > 2) { // Close the polygon if within 20 pixels of start
+      if (distance < 50 && currentPolygon.length > 2) { // Close the polygon if within 50 pixels of start
         if (towerName) {
           const newShape: Shape = {
             id: Date.now(),
@@ -219,7 +227,7 @@ const InteractiveImageUploader = () => {
         Math.pow(x - startPoint.x, 2) + Math.pow(y - startPoint.y, 2)
       );
 
-      if (distance < 20 && currentFreeform.length > 2) {
+      if (distance < 50 && currentFreeform.length > 2) {
         // Complete the freeform shape
         const newShape: Shape = {
           id: Date.now(),
@@ -254,8 +262,8 @@ const InteractiveImageUploader = () => {
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const currentX = ((e.clientX - rect.left) / rect.width) * 4000;
+    const currentY = ((e.clientY - rect.top) / rect.height) * 2250;
     
     
     if (drawMode === 'line' && currentPolygon.length > 0) {
@@ -295,8 +303,8 @@ const InteractiveImageUploader = () => {
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!drawing.points || !svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const currentX = ((e.clientX - rect.left) / rect.width) * 4000;
+    const currentY = ((e.clientY - rect.top) / rect.height) * 2250;
     const id = Date.now();
 
     if (drawing.type === 'rectangle') {
@@ -334,7 +342,10 @@ const InteractiveImageUploader = () => {
   const fetchAvailableUnits = async () => {
     try {
       const response = await axiosInstance.get(`/api/towers/${tower_id}/units`);
-      setAvailableUnits(response.data.units || []);
+      
+      // Process the response data to replace S3 URLs with CloudFront URLs
+      const processedData = processApiResponse(response.data) as any;
+      setAvailableUnits(processedData.units || []);
     } catch (error) {
       console.error('Error fetching units:', error);
       setAvailableUnits([]);
@@ -368,8 +379,8 @@ const InteractiveImageUploader = () => {
     if (!svgRef.current) return;
     
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = ((e.clientX - rect.left) / rect.width) * 4000;
+    const y = ((e.clientY - rect.top) / rect.height) * 2250;
 
     // In dot mode, clicking the outline adds a dot at the clicked point
     if (dotMode) {
@@ -721,7 +732,7 @@ const InteractiveImageUploader = () => {
           d={pathData}
           fill="rgba(255, 255, 255, 0)"
           stroke="green"
-          strokeWidth="2"
+          strokeWidth="8"
           onClick={(e) => handleShapeBorderClick(e, shape.id)}
           onMouseOver={(e) => handleMouseOver(e, shape.name, shape.id.toString())}
           onMouseOut={handleMouseOut}
@@ -744,7 +755,7 @@ const InteractiveImageUploader = () => {
               d={path}
               fill="rgba(0, 0, 255, 0.1)"
               stroke="blue"
-              strokeWidth="1"
+              strokeWidth="8"
             />
           );
         });
@@ -759,10 +770,10 @@ const InteractiveImageUploader = () => {
             key={`${shape.id}-border-${lastIndex}`}
             cx={point.x}
             cy={point.y}
-            r={4}
+            r={15}
             fill="red"
             stroke="darkred"
-            strokeWidth="1"
+            strokeWidth="5"
           />
         );
       }
@@ -778,7 +789,7 @@ const InteractiveImageUploader = () => {
               d={pathData}
               fill={part.mappedUnitId ? "rgba(255, 165, 0, 0.3)" : "rgba(0, 255, 0, 0.3)"}
               stroke={part.mappedUnitId ? "orange" : "green"}
-              strokeWidth="2"
+              strokeWidth="8"
               onClick={(e) => {
                 e.stopPropagation();
                 handlePartClick(shape.id, part.id, index);
@@ -786,7 +797,7 @@ const InteractiveImageUploader = () => {
               onMouseOver={(e) => {
                 const unit = availableUnits.find(u => u.id === part.mappedUnitId);
                 const hoverText = part.mappedUnitId && unit 
-                  ? `Unit ${unit.name}` 
+                  ? (unit.slug ? `${unit.slug}` : `Unit ${unit.name}`)
                   : `Floor Section ${index + 1}`;
                 handleMouseOver(e, hoverText, `${part.id}`);
               }}
@@ -806,7 +817,7 @@ const InteractiveImageUploader = () => {
               key={`floor-text-${shape.id}-${part.id}`}
               x={maxX + 10}
               y={centerY}
-              fontSize="14"
+              fontSize="50"
               fill="red"
               fontWeight="bold"
               textAnchor="start"
@@ -845,7 +856,7 @@ const InteractiveImageUploader = () => {
     } else if (shape.type === 'line' || shape.type === 'simple-line') {      
       const [start, end] = shape.points;
       const strokeColor = shape.type === 'simple-line' ? 'blue' : 'green';
-      const strokeWidth = shape.type === 'simple-line' ? '3' : '2';
+      const strokeWidth = shape.type === 'simple-line' ? '8' : '8';
       return (
         <g key={shape.id}>
           <line
@@ -868,10 +879,10 @@ const InteractiveImageUploader = () => {
                 key={`${shape.id}-border-${lastIndex}`}
                 cx={point.x}
                 cy={point.y}
-                r={4}
+                r={15}
                 fill="red"
                 stroke="darkred"
-                strokeWidth="1"
+                strokeWidth="5"
               />
             );
           })()}
@@ -887,7 +898,7 @@ const InteractiveImageUploader = () => {
                   x2={line.endPoint.x}
                   y2={line.endPoint.y}
                   stroke={line.color}
-                  strokeWidth="2"
+                  strokeWidth="8"
                 />
               );
             }
@@ -907,7 +918,7 @@ const InteractiveImageUploader = () => {
             d={pathData}
             fill={shape.isClosed ? (shape.mappedUnitId ? "rgba(255, 165, 0, 0.3)" : "rgba(0, 255, 0, 0.2)") : "none"}
             stroke={shape.mappedUnitId ? "orange" : "green"}
-            strokeWidth="3"
+            strokeWidth="8"
             onClick={(e) => {
               if (!shape.isClosed) {
                 handleShapeBorderClick(e, shape.id);
@@ -916,7 +927,7 @@ const InteractiveImageUploader = () => {
             onMouseOver={(e) => {
               const unit = availableUnits.find(u => u.id === shape.mappedUnitId);
               const hoverText = shape.mappedUnitId && unit 
-                ? `Unit ${unit.name}` 
+                ? (unit.slug ? `${unit.slug}` : `Unit ${unit.name}`)
                 : shape.name;
               handleMouseOver(e, hoverText, shape.id.toString());
             }}
@@ -930,14 +941,14 @@ const InteractiveImageUploader = () => {
               <text
                 x={shape.points[0].x + 10}
                 y={shape.points[0].y - 10}
-                fontSize="12"
+                fontSize="50"
                 fill="black"
                 fontWeight="bold"
                 textAnchor="start"
                 dominantBaseline="middle"
                 style={{ pointerEvents: 'none' }}
               >
-                Unit {unit.name}
+                {unit.slug ? `${unit.slug}` : `Unit ${unit.name}`}
               </text>
             ) : null;
           })()}
@@ -950,10 +961,10 @@ const InteractiveImageUploader = () => {
                 key={`${shape.id}-border-${lastIndex}`}
                 cx={point.x}
                 cy={point.y}
-                r={4}
+                r={15}
                 fill="red"
                 stroke="darkred"
-                strokeWidth="1"
+                strokeWidth="5"
               />
             );
           })()}
@@ -969,7 +980,7 @@ const InteractiveImageUploader = () => {
                   x2={line.endPoint.x}
                   y2={line.endPoint.y}
                   stroke={line.color}
-                  strokeWidth="2"
+                  strokeWidth="8"
                 />
               );
             }
@@ -990,7 +1001,7 @@ const InteractiveImageUploader = () => {
             height={height}
             fill="rgba(0, 255, 0, 0.3)"
             stroke="green"
-            strokeWidth="2"
+            strokeWidth="8"
             onClick={(e) => handleShapeBorderClick(e, shape.id)}
             onMouseOver={(e) => handleMouseOver(e, shape.name, shape.id.toString())}
             onMouseOut={handleMouseOut}
@@ -1004,10 +1015,10 @@ const InteractiveImageUploader = () => {
                 key={`${shape.id}-border-${lastIndex}`}
                 cx={point.x}
                 cy={point.y}
-                r={4}
+                r={15}
                 fill="red"
                 stroke="darkred"
-                strokeWidth="1"
+                strokeWidth="5"
               />
             );
           })()}
@@ -1023,7 +1034,7 @@ const InteractiveImageUploader = () => {
                   x2={line.endPoint.x}
                   y2={line.endPoint.y}
                   stroke={line.color}
-                  strokeWidth="2"
+                  strokeWidth="8"
                 />
               );
             }
@@ -1138,7 +1149,7 @@ const InteractiveImageUploader = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 55}}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, justifyContent: 'space-between'  }}>
         <Typography variant="h4">
           Manage Tower Details - {towerName}
         </Typography>
@@ -1402,7 +1413,7 @@ const InteractiveImageUploader = () => {
               {availableUnits.length > 0 ? (
                 availableUnits.map((unit) => (
                   <MenuItem key={unit.id} value={unit.id}>
-                    Unit {unit.name}
+                    {unit.slug ? `${unit.slug}` : `Unit ${unit.name}`}
                   </MenuItem>
                 ))
               ) : (
@@ -1423,7 +1434,16 @@ const InteractiveImageUploader = () => {
         </Box>
       </Modal>
 
-      <div style={{ position: 'relative', width: '100%', height: 'auto' }}>
+      <Box sx={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: 'auto',
+        maxWidth: '100%',
+        overflow: 'hidden',
+        borderRadius: 1,
+        border: '1px solid',
+        borderColor: 'divider'
+      }}>
         {imageSrc && (
           <>
             <img 
@@ -1457,6 +1477,8 @@ const InteractiveImageUploader = () => {
               onClick={handleClick}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
+              viewBox="0 0 4000 2250"
+              preserveAspectRatio="xMidYMid slice"
               style={{
                 position: 'absolute',
                 top: 0,
@@ -1471,7 +1493,7 @@ const InteractiveImageUploader = () => {
               
               {/* Render dot points */}
               {dotPoints.map((pt, idx) => (
-                <circle key={`dot-${idx}`} cx={pt.x} cy={pt.y} r={4} fill="red" stroke="darkred" strokeWidth="1" />
+                <circle key={`dot-${idx}`} cx={pt.x} cy={pt.y} r={15} fill="red" stroke="darkred" strokeWidth="5" />
               ))}
               {/* Draw internal points and lines */}
               {shapes.filter(s => s.type === 'polygon' && s.isClosed).map(poly => {
@@ -1479,7 +1501,7 @@ const InteractiveImageUploader = () => {
                 return (
                   <g key={poly.id + '-internal'}>
                     {points.map((pt, idx) => (
-                      <circle key={idx} cx={pt.x} cy={pt.y} r={5} fill="red" />
+                      <circle key={idx} cx={pt.x} cy={pt.y} r={15} fill="red" />
                     ))}
                     {points.length === 2 && (
                       <line
@@ -1488,7 +1510,7 @@ const InteractiveImageUploader = () => {
                         x2={points[1].x}
                         y2={points[1].y}
                         stroke="red"
-                        strokeWidth={2}
+                        strokeWidth={8}
                       />
                     )}
                   </g>
@@ -1499,7 +1521,7 @@ const InteractiveImageUploader = () => {
                   d={currentPath}
                   fill="none"
                   stroke="green"
-                  strokeWidth="2"
+                  strokeWidth="8"
                   strokeDasharray="5,5"
                   onMouseOver={(e) => handleMouseOver(e, "Drawing in progress", "temp-" + Date.now())}
                   onMouseOut={handleMouseOut}
@@ -1525,7 +1547,7 @@ const InteractiveImageUploader = () => {
             {hoveredName}
           </div>
         )}
-      </div>
+      </Box>
     </Box>
   );
 };

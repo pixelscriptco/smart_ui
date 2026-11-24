@@ -108,8 +108,11 @@ const InteractiveImageUploader = () => {
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const img = document.querySelector('img');
+    const imgWidth = img?.naturalWidth || 4000;
+    const imgHeight = img?.naturalHeight || 2250;
+    const x = ((e.clientX - rect.left) / rect.width) * imgWidth;
+    const y = ((e.clientY - rect.top) / rect.height) * imgHeight;
     if (drawMode === 'polygon') {
       setCurrentPolygon([{ x, y }]);
     } else {
@@ -120,12 +123,15 @@ const InteractiveImageUploader = () => {
   const handleClick = (e: React.MouseEvent) => {
     if (!svgRef.current || (!currentPolygon.length && !drawing.points)) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const img = document.querySelector('img');
+    const imgWidth = img?.naturalWidth || 4000;
+    const imgHeight = img?.naturalHeight || 2250;
+    const x = ((e.clientX - rect.left) / rect.width) * imgWidth;
+    const y = ((e.clientY - rect.top) / rect.height) * imgHeight;
     if (drawMode === 'polygon' && currentPolygon.length > 0) {
       const startPoint = currentPolygon[0];
       const distance = Math.sqrt(Math.pow(x - startPoint.x, 2) + Math.pow(y - startPoint.y, 2));
-      if (distance < 20 && currentPolygon.length > 2) {
+      if (distance < 50 && currentPolygon.length > 2) {
         // Close polygon, open modal for 3D image
         const closedPolygon = [...currentPolygon, startPoint];
         setPendingPolygon(closedPolygon);
@@ -139,8 +145,11 @@ const InteractiveImageUploader = () => {
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const img = document.querySelector('img');
+    const imgWidth = img?.naturalWidth || 4000;
+    const imgHeight = img?.naturalHeight || 2250;
+    const currentX = ((e.clientX - rect.left) / rect.width) * imgWidth;
+    const currentY = ((e.clientY - rect.top) / rect.height) * imgHeight;
     if (drawMode === 'polygon' && currentPolygon.length > 0) {
       const path = `M ${currentPolygon.map(p => `${p.x} ${p.y}`).join(' L ')} L ${currentX} ${currentY}`;
       setCurrentPath(path);
@@ -179,8 +188,11 @@ const InteractiveImageUploader = () => {
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!drawing.points || !svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const img = document.querySelector('img');
+    const imgWidth = img?.naturalWidth || 4000;
+    const imgHeight = img?.naturalHeight || 2250;
+    const currentX = ((e.clientX - rect.left) / rect.width) * imgWidth;
+    const currentY = ((e.clientY - rect.top) / rect.height) * imgHeight;
     const id = Date.now();
     const newShape: Shape = {
       id,
@@ -568,7 +580,16 @@ const InteractiveImageUploader = () => {
         )}
       </Paper>
 
-      <div style={{ position: 'relative', width: '100%', height: 'auto' }}>
+      <Box sx={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: 'auto',
+        maxWidth: '100%',
+        overflow: 'hidden',
+        borderRadius: 1,
+        border: '1px solid',
+        borderColor: 'divider'
+      }}>
         {imageSrc && (
           <>
             <img 
@@ -588,6 +609,8 @@ const InteractiveImageUploader = () => {
               onClick={handleClick}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
+              viewBox={`0 0 ${imageSrc ? (document.querySelector('img')?.naturalWidth || 4000) : 4000} ${imageSrc ? (document.querySelector('img')?.naturalHeight || 2250) : 2250}`}
+              preserveAspectRatio="xMidYMid meet"
               style={{
                 position: 'absolute',
                 top: 0,
@@ -611,7 +634,7 @@ const InteractiveImageUploader = () => {
             </svg>
           </>
         )}
-      </div>
+      </Box>
       <Dialog open={is3DModalOpen} onClose={handle3DModalClose} maxWidth="md" fullWidth>
         <Paper sx={{ p: 3, borderRadius: 3, background: '#f8fafc' }}>
           <DialogTitle sx={{ fontWeight: 700, fontSize: 24, textAlign: 'center', pb: 1 }}>
@@ -639,19 +662,6 @@ const InteractiveImageUploader = () => {
                 </Box>
               )}
               
-              <FormControl fullWidth>
-                <InputLabel id="balcony-image-type-label">Image Type</InputLabel>
-                <Select
-                  labelId="balcony-image-type-label"
-                  value={balconyImageType}
-                  label="Image Type"
-                  onChange={e => setBalconyImageType(e.target.value)}
-                  sx={{ mb: 2, borderRadius: 2 }}
-                >
-                  {/* <MenuItem value="3d">3D</MenuItem> */}
-                  <MenuItem value="normal">Normal</MenuItem>
-                </Select>
-              </FormControl>
               <TextField
                 label="Name of the balcony"
                 value={balconyImageName}

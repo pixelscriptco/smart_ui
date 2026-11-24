@@ -29,7 +29,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '../utils/axios';
-
+import { replaceS3WithCloudFront, processApiResponse } from '../utils/urlReplacer';
 interface Amenity {
   id: number;
   name: string;
@@ -64,7 +64,9 @@ const TowerAmenities = () => {
   const fetchAmenities = async () => {
     try {
       const response = await axiosInstance.get(`/api/projects/${project_id}/amenities`);
-      setAmenities(response.data.amenities);
+      const processedData = processApiResponse(response.data) as any;
+
+      setAmenities(processedData.amenities || '');
     } catch (err) {
       console.error('Error fetching amenities:', err);
       setError('Failed to load amenities');
@@ -127,8 +129,8 @@ const TowerAmenities = () => {
       if (newAmenity.image) {
         formData.append('image', newAmenity.image);
       }
-
-      if (isEditing && newAmenity.id) {
+            
+      if (isEditing && newAmenity.id) {        
         await axiosInstance.put(`/api/projects/${project_id}/amenities/${newAmenity.id}`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
@@ -170,7 +172,7 @@ const TowerAmenities = () => {
     if (!amenityToDelete) return;
 
     try {
-      await axiosInstance.delete(`/api/towers/amenities/${amenityToDelete}`);
+      await axiosInstance.delete(`/api/projects/amenities/${amenityToDelete}`);
       setSuccess('Amenity deleted successfully');
       fetchAmenities();
     } catch (err) {

@@ -35,11 +35,12 @@ import {
   FormControlLabel,
   Grid
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon, Search as SearchIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Business as BusinessIcon, Upload as UploadIcon, Search as SearchIcon, ContentCopy as ContentCopyIcon, VideoLibrary as VideoLibraryIcon } from '@mui/icons-material';
 import RoomIcon from '@mui/icons-material/Room';
 import axiosInstance from '../utils/axios';
 import LexicalEditor from '../components/LexicalEditor';
 import { MapPicker } from '../components/MapPicker';
+import { replaceS3WithCloudFront, processApiResponse } from '../utils/urlReplacer';
 interface User {
   company: string;
   url: string
@@ -50,6 +51,7 @@ interface Project {
   name: string;
   description: string;
   website_link: string;
+  walkthrough_video:string;
   logo: string;
   url: string;
   project_url: string;
@@ -80,6 +82,8 @@ interface ProjectFormData {
   company_id: number;
   registration_number?: string;
   qr_code?: File | null;
+  walkthrough_video?: string | null;
+  home_location_description?: string;
   location?: string;
   location_title?: string;
   location_description?: string;
@@ -103,6 +107,8 @@ const Projects: React.FC = () => {
     company_id: 0,
     registration_number: '',
     qr_code: null,
+    walkthrough_video: null,
+    home_location_description: '',
     location: '',
     location_title: '',
     location_description: '',
@@ -113,6 +119,7 @@ const Projects: React.FC = () => {
   const [qrCodePreview, setQrCodePreview] = useState<string | null>(null);
   const [locationImagePreview, setLocationImagePreview] = useState<string | null>(null);
   const [locationLogoPreview, setLocationLogoPreview] = useState<string | null>(null);
+  const [walkthroughVideoPreview, setWalkthroughVideoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -161,7 +168,17 @@ const Projects: React.FC = () => {
     setError(null);
     try {
       const response = await axiosInstance.get('/api/projects');
-      setProjects(response.data.data);
+      
+      // Process the response data to replace S3 URLs with CloudFront URLs
+      const processedData = processApiResponse(response.data) as any;
+      const processedProjects = (processedData.data || []).map((project: Project) => ({
+        ...project,
+        logo: replaceS3WithCloudFront(project.logo || ''),
+        location_logo: replaceS3WithCloudFront((project as any).location_logo || ''),
+        location_image: replaceS3WithCloudFront((project as any).location_image || ''),
+      }));
+      
+      setProjects(processedProjects);
     } catch (err: any) {
       console.error('Error fetching projects:', err);
       setError('Failed to fetch projects. Please try again.');
@@ -211,8 +228,10 @@ const Projects: React.FC = () => {
         location: (project as any).location || '',
         location_title: (project as any).location_title || '',
         location_description: (project as any).location_description || '',
+        home_location_description: (project as any).home_location_description || '',  
         location_image: null,
-        location_logo:null
+        location_logo:null,
+        walkthrough_video: project.walkthrough_video || null,
       });
 
       // Set existing coordinates if available
@@ -369,6 +388,8 @@ const Projects: React.FC = () => {
       company_id: 0,
       registration_number: '',
       qr_code: null,
+      walkthrough_video: null,
+      home_location_description: '',
       location: '',
       location_title: '',
       location_description: '',
@@ -379,6 +400,7 @@ const Projects: React.FC = () => {
     setQrCodePreview(null);
     setLocationImagePreview(null);
     setLocationLogoPreview(null);
+    setWalkthroughVideoPreview(null);
     setIsEditing(false);
     setCurrentProjectId(null);
   };
@@ -545,6 +567,46 @@ const Projects: React.FC = () => {
     }
   };
 
+  // const handleWalkthroughVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (file) {
+  //     // Validate file size (100MB limit)
+  //     if (file.size > 100 * 1024 * 1024) {
+  //       setValidationErrors(prev => ({
+  //         ...prev,
+  //         walkthrough_video: 'Video file size must be less than 100MB'
+  //       }));
+  //       return;
+  //     }
+
+  //     // Validate file type
+  //     if (!file.type.startsWith('video/')) {
+  //       setValidationErrors(prev => ({
+  //         ...prev,
+  //         walkthrough_video: 'Please select a valid video file'
+  //       }));
+  //       return;
+  //     }
+
+  //     setFormData(prev => ({
+  //       ...prev,
+  //       walkthrough_video: file
+  //     }));
+
+  //     const reader = new FileReader();
+  //     reader.onloadend = () => {
+  //       setWalkthroughVideoPreview(reader.result as string);
+  //       // Clear walkthrough video validation error when video is successfully selected
+  //       setValidationErrors(prev => {
+  //         const newErrors = { ...prev };
+  //         delete newErrors.walkthrough_video;
+  //         return newErrors;
+  //       });
+  //     };
+  //     reader.readAsDataURL(file);
+  //   }
+  // };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
@@ -586,6 +648,12 @@ const Projects: React.FC = () => {
     }
     if (formData.location_description) {
       formDataToSend.append('location_description', formData.location_description);
+    }
+    if (formData.home_location_description) {
+      formDataToSend.append('home_location_description', formData.home_location_description);
+    }
+    if (formData.walkthrough_video) {
+      formDataToSend.append('walkthrough_video', formData.walkthrough_video);
     }
     if (formData.location_image) {
       formDataToSend.append('location_image', formData.location_image);
@@ -1030,6 +1098,7 @@ const Projects: React.FC = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 required
+                disabled={isEditing ? true : false}
                 error={!!validationErrors.name}
                 helperText={validationErrors.name}
               />
@@ -1043,6 +1112,7 @@ const Projects: React.FC = () => {
                 helperText={validationErrors.project_url}
               />
               <Box>
+                <InputLabel>About Project Description</InputLabel>
                 <LexicalEditor
                   initialValue={formData.description}
                   onChange={(html) => {
@@ -1072,6 +1142,54 @@ const Projects: React.FC = () => {
                 error={!!validationErrors.website_link}
                 helperText={validationErrors.website_link}
               />
+              
+              <TextField
+                fullWidth
+                label="Animated Walkthrough URL"
+                name="walkthrough_video"
+                value={formData.walkthrough_video}
+                onChange={handleInputChange}
+                placeholder="Animated Walkthrough"
+                error={!!validationErrors.walkthrough_video}
+                helperText={validationErrors.walkthrough_video}
+              />
+
+              {/* <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                label="Location Description"
+                name="home_location_description"
+                value={formData.home_location_description}
+                onChange={handleInputChange}
+                placeholder="Describe the location, neighborhood, amenities, and surroundings..."
+                error={!!validationErrors.home_location_description}
+                helperText={validationErrors.home_location_description}
+              /> */}
+
+              <Box>
+                <InputLabel>Map Project Description</InputLabel>
+                <LexicalEditor
+                  initialValue={formData.home_location_description}
+                  onChange={(html) => {
+                    setFormData(prev => ({ ...prev, home_location_description: html }));
+                    // Clear home_location_description validation error when user starts typing
+                    if (validationErrors.home_location_description) {
+                      setValidationErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.home_location_description;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                />
+                {validationErrors.home_location_description && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, ml: 2 }}>
+                    {validationErrors.home_location_description}
+                  </Typography>
+                )}
+              </Box>
+
               <h3>Project Details - Map Page</h3>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -1131,7 +1249,7 @@ const Projects: React.FC = () => {
                   error={!!validationErrors.location_title}
                   helperText={validationErrors.location_title}
                 />
-              <TextField
+              {/* <TextField
                 fullWidth
                 multiline
                 minRows={2}
@@ -1141,7 +1259,31 @@ const Projects: React.FC = () => {
                 onChange={handleInputChange}
                 error={!!validationErrors.location}
                 helperText={validationErrors.location}
-              />
+              /> */}
+
+              <Box>
+                <LexicalEditor
+                  initialValue={formData.location_description}
+                  onChange={(html) => {
+                    setFormData(prev => ({ ...prev, location_description: html }));
+                    // Clear location_description validation error when user starts typing
+                    if (validationErrors.location_description) {
+                      setValidationErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.location_description;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                />
+                {validationErrors.location_description && (
+                  <Typography variant="caption" color="error" sx={{ mt: 1, ml: 2 }}>
+                    {validationErrors.location_description}
+                  </Typography>
+                )}
+              </Box>
+
+
               <MapPicker
                 coordinates={coordinates}
                 setCoordinates={setCoordinates}
@@ -1193,10 +1335,10 @@ const Projects: React.FC = () => {
           </DialogTitle>
           <DialogContent>
             <Typography variant="body1" sx={{ mb: 2 }}>
-              The builder URL is not set for this project's client.
+              The builder URL is not set for this project's builder.
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Please ask the builder to set their URL from the Clients page before copying the project URL.
+            Please set the HTTP URL in the Builder tab/menu
             </Typography>
             {selectedProjectForUrl && (
               <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
@@ -1220,7 +1362,7 @@ const Projects: React.FC = () => {
                 navigate('/builder');
               }}
             >
-              Go to Clients
+              Go to Builder
             </Button>
           </DialogActions>
         </Dialog>

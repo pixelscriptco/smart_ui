@@ -23,7 +23,9 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SearchIcon from '@mui/icons-material/Search';
+import DownloadIcon from '@mui/icons-material/Download';
 import axiosInstance from '../utils/axios';
+import * as XLSX from 'xlsx';
 
 interface Enquiry {
   id: string;
@@ -39,8 +41,8 @@ interface Enquiry {
 
 const statusColors: Record<string, 'success' | 'warning' | 'error'> = {
   pending: 'warning',
-  confirmed: 'success',
-  cancelled: 'error',
+  confirmed: 'error',
+  cancelled: 'success',
 };
 
 const typeColors: Record<string, 'error' | 'warning' | 'info'> = {
@@ -102,20 +104,57 @@ const Enquiries: React.FC = () => {
     setPage(0);
   };
 
+  const handleExportExcel = () => {
+    // Prepare data for Excel export
+    const exportData = enquiries.map((enquiry) => ({
+      'Project': enquiry.project?.name || '',
+      'Unit': enquiry.unit?.slug || enquiry.unit?.name || '',
+      'First Name': enquiry.first_name,
+      'Last Name': enquiry.last_name,
+      'Email': enquiry.email,
+      'Mobile': enquiry.mobile,
+      'Status': enquiry.status.charAt(0).toUpperCase() + enquiry.status.slice(1),
+      'Type': enquiry.type && enquiry.type !== 'select' ? enquiry.type.charAt(0).toUpperCase() + enquiry.type.slice(1) : '-',
+    }));
+
+    // Create workbook and worksheet
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Enquiries');
+
+    // Generate filename with current date
+    const currentDate = new Date().toISOString().split('T')[0];
+    const filename = `enquiries_${currentDate}.xlsx`;
+
+    // Save the file
+    XLSX.writeFile(wb, filename);
+  };
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h4" gutterBottom>
           Enquiries
         </Typography>
-        <Button
-          variant="outlined"
-          color="primary"
-          startIcon={<RefreshIcon />}
-          onClick={fetchEnquiries}
-        >
-          Refresh
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<DownloadIcon />}
+            onClick={handleExportExcel}
+            disabled={enquiries.length === 0}
+          >
+            Export Excel
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<RefreshIcon />}
+            onClick={fetchEnquiries}
+          >
+            Refresh
+          </Button>
+        </Box>
       </Box>
       <Paper sx={{ p: 2, mb: 2 }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>

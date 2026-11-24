@@ -4,6 +4,7 @@ import { CloudUpload as CloudUploadIcon, Save as SaveIcon, Straighten as LineIco
 import axiosInstance from '../utils/axios';
 import { useNavigate, useParams } from 'react-router-dom';
 import NameInputModal from '../components/NameInputModal';
+import { replaceS3WithCloudFront, processApiResponse } from '../utils/urlReplacer';
 
 type Point = {
   x: number;
@@ -57,8 +58,11 @@ const InteractiveImageUploader = () => {
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const img = document.querySelector('img');
+    const imgWidth = img?.naturalWidth || 4000;
+    const imgHeight = img?.naturalHeight || 2250;
+    const x = ((e.clientX - rect.left) / rect.width) * imgWidth;
+    const y = ((e.clientY - rect.top) / rect.height) * imgHeight;
 
     if (drawMode === 'line') {
       // Start a new polygon on double click
@@ -75,18 +79,25 @@ const InteractiveImageUploader = () => {
       
       try {
         const response = await axiosInstance.get(`/api/floors/${floor_id}/plan`);
-        const { name, image_url, svg_url } = response.data.floor.floor_plan;
+        
+        // Process the response data to replace S3 URLs with CloudFront URLs
+        const processedData = processApiResponse(response.data) as any;
+        const { name, image_url, svg_url } = processedData.floor?.floor_plan || {};
 
         setFloorPlanName(name);
 
+        // Replace S3 URLs with CloudFront URLs
+        const cloudFrontImageUrl = replaceS3WithCloudFront(image_url);
+        const cloudFrontSvgUrl = replaceS3WithCloudFront(svg_url);
+
         // Load image
-        const imageResp = await fetch(image_url);        
+        const imageResp = await fetch(cloudFrontImageUrl);        
         const imageBlob = await imageResp.blob();
         const imageBase64 = await convertBlobToBase64(imageBlob);
         setImageSrc(imageBase64 as string);
 
         // Load SVG content
-        const svgResp = await fetch(svg_url);
+        const svgResp = await fetch(cloudFrontSvgUrl);
         const svgText = await svgResp.text();
         setSvgContent(svgText);
         setIsExistingFloorPlan(true); // Set to true for existing Floor Plan
@@ -125,14 +136,17 @@ const InteractiveImageUploader = () => {
     if (!svgRef.current || (!currentPolygon.length && !drawing.points)) return;
   
     const rect = svgRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const img = document.querySelector('img');
+    const imgWidth = img?.naturalWidth || 4000;
+    const imgHeight = img?.naturalHeight || 2250;
+    const x = ((e.clientX - rect.left) / rect.width) * imgWidth;
+    const y = ((e.clientY - rect.top) / rect.height) * imgHeight;
   
     if (drawMode === 'line' && currentPolygon.length > 0) {
       const startPoint = currentPolygon[0];
       const distance = Math.sqrt(Math.pow(x - startPoint.x, 2) + Math.pow(y - startPoint.y, 2));
   
-      if (distance < 20) {
+      if (distance < 50) {
         // Close polygon, show modal for name
         const closedPolygon = [...currentPolygon, startPoint];
         setPendingPolygon(closedPolygon);
@@ -147,8 +161,11 @@ const InteractiveImageUploader = () => {
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const img = document.querySelector('img');
+    const imgWidth = img?.naturalWidth || 4000;
+    const imgHeight = img?.naturalHeight || 2250;
+    const currentX = ((e.clientX - rect.left) / rect.width) * imgWidth;
+    const currentY = ((e.clientY - rect.top) / rect.height) * imgHeight;
     
     if (drawMode === 'line' && currentPolygon.length > 0) {
       // Create path for the current polygon being drawn
@@ -177,8 +194,11 @@ const InteractiveImageUploader = () => {
   const handleMouseUp = (e: React.MouseEvent) => {
     if (!drawing.points || !svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const img = document.querySelector('img');
+    const imgWidth = img?.naturalWidth || 4000;
+    const imgHeight = img?.naturalHeight || 2250;
+    const currentX = ((e.clientX - rect.left) / rect.width) * imgWidth;
+    const currentY = ((e.clientY - rect.top) / rect.height) * imgHeight;
     const id = Date.now();
 
     const newShape: Shape = {
@@ -334,15 +354,24 @@ const InteractiveImageUploader = () => {
     setSelectedFloorPlanId(floorPlanId);
     try {
       const response = await axiosInstance.get(`/api/floor-plans/${floorPlanId}`);
-      const { name, image_url, svg_url } = response.data.floor_plan;
+      
+      // Process the response data to replace S3 URLs with CloudFront URLs
+      const processedData = processApiResponse(response.data) as any;
+      const { name, image_url, svg_url } = processedData.floor_plan || {};
+      
       setFloorPlanName(name);
+      
+      // Replace S3 URLs with CloudFront URLs
+      const cloudFrontImageUrl = replaceS3WithCloudFront(image_url);
+      const cloudFrontSvgUrl = replaceS3WithCloudFront(svg_url);
+      
       // Load image
-      const imageResp = await fetch(image_url);
+      const imageResp = await fetch(cloudFrontImageUrl);
       const imageBlob = await imageResp.blob();
       const imageBase64 = await convertBlobToBase64(imageBlob);
       setImageSrc(imageBase64 as string);
       // Load SVG content
-      const svgResp = await fetch(svg_url);
+      const svgResp = await fetch(cloudFrontSvgUrl);
       const svgText = await svgResp.text();
       setSvgContent(svgText);
       setIsExistingFloorPlan(true);
@@ -361,7 +390,7 @@ const InteractiveImageUploader = () => {
           d={pathData}
           fill="rgba(0, 255, 0, 0.3)"
           stroke="green"
-          strokeWidth="2"
+          strokeWidth="8"
           onClick={() => handleShapeClick(shape.id)}
           onMouseOver={(e) => handleMouseOver(e, shape.name, shape.id.toString())}
           onMouseOut={handleMouseOut}
@@ -377,7 +406,7 @@ const InteractiveImageUploader = () => {
           x2={end.x}
           y2={end.y}
           stroke="green"
-          strokeWidth="2"
+          strokeWidth="8"
           onClick={() => handleShapeClick(shape.id)}
           onMouseOver={(e) => handleMouseOver(e, shape.name, shape.id.toString())}
           onMouseOut={handleMouseOut}
@@ -396,7 +425,7 @@ const InteractiveImageUploader = () => {
           height={height}
           fill="rgba(0, 255, 0, 0.3)"
           stroke="green"
-          strokeWidth="2"
+          strokeWidth="8"
           onClick={() => handleShapeClick(shape.id)}
           onMouseOver={(e) => handleMouseOver(e, shape.name, shape.id.toString())}
           onMouseOut={handleMouseOut}
@@ -407,7 +436,7 @@ const InteractiveImageUploader = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 4, justifyContent:'space-between' }}>
         <Typography variant="h4">
           Manage Floor Plan
         </Typography>
@@ -522,7 +551,16 @@ const InteractiveImageUploader = () => {
         )}
       </Paper>
 
-      <div style={{ position: 'relative', width: '100%', height: 'auto' }}>
+      <Box sx={{ 
+        position: 'relative', 
+        width: '100%', 
+        height: 'auto',
+        maxWidth: '100%',
+        overflow: 'hidden',
+        borderRadius: 1,
+        border: '1px solid',
+        borderColor: 'divider'
+      }}>
         {imageSrc && (
           <>
             <img 
@@ -556,6 +594,8 @@ const InteractiveImageUploader = () => {
               onClick={handleClick}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
+              viewBox={`0 0 ${imageSrc ? (document.querySelector('img')?.naturalWidth || 4000) : 4000} ${imageSrc ? (document.querySelector('img')?.naturalHeight || 2250) : 2250}`}
+              preserveAspectRatio="xMidYMid meet"
               style={{
                 position: 'absolute',
                 top: 0,
@@ -572,7 +612,7 @@ const InteractiveImageUploader = () => {
                   d={currentPath}
                   fill="none"
                   stroke="green"
-                  strokeWidth="2"
+                  strokeWidth="8"
                   strokeDasharray="5,5"
                   onMouseOver={(e) => handleMouseOver(e, "Drawing in progress", "temp-" + Date.now())}
                   onMouseOut={handleMouseOut}
@@ -598,7 +638,7 @@ const InteractiveImageUploader = () => {
             {hoveredName}
           </div>
         )}
-      </div>
+      </Box>
 
       <NameInputModal
         isOpen={isNameModalOpen}
